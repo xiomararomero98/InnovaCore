@@ -1,5 +1,7 @@
 package com.innovacore.ms_recursos.Service;
 
+import com.innovacore.ms_recursos.Event.AsignacionCreadaEvent;
+import com.innovacore.ms_recursos.Event.AsignacionEventPublisher;
 import com.innovacore.ms_recursos.Model.Asignacion;
 import com.innovacore.ms_recursos.Model.Empleado;
 import com.innovacore.ms_recursos.Repository.AsignacionRepository;
@@ -15,10 +17,15 @@ public class AsignacionService {
 
     private final AsignacionRepository repository;
     private final EmpleadoRepository empleadoRepository;
+    private final AsignacionEventPublisher eventPublisher;
 
-    public AsignacionService(AsignacionRepository repository, EmpleadoRepository empleadoRepository) {
+    public AsignacionService(
+            AsignacionRepository repository,
+            EmpleadoRepository empleadoRepository,
+            AsignacionEventPublisher eventPublisher) {
         this.repository = repository;
         this.empleadoRepository = empleadoRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     // ==========================================================
@@ -83,7 +90,22 @@ public class AsignacionService {
         empleado.setDisponibilidad("OCUPADO");
         empleadoRepository.save(empleado);
 
-        return repository.save(asignacion);
+        Asignacion asignacionGuardada = repository.save(asignacion);
+
+        // ==========================================================
+        // PUBLICAR EVENTO: ASIGNACIÓN CREADA
+        // ==========================================================
+        AsignacionCreadaEvent evento = AsignacionCreadaEvent.crear(
+                asignacionGuardada.getId(),
+                empleado.getId(),
+                empleado.getNombre() + " " + empleado.getApellido(),
+                asignacionGuardada.getIdProyecto(),
+                asignacionGuardada.getHorasAsignadas(),
+                asignacionGuardada.getRolEnProyecto()
+        );
+        eventPublisher.publicarAsignacionCreada(evento);
+
+        return asignacionGuardada;
     }
 
     // ==========================================================

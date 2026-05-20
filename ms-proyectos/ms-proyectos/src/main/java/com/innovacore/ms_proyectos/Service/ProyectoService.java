@@ -1,5 +1,7 @@
 package com.innovacore.ms_proyectos.Service;
 
+import com.innovacore.ms_proyectos.Event.ProyectoCreadoEvent;
+import com.innovacore.ms_proyectos.Event.ProyectoEventPublisher;
 import com.innovacore.ms_proyectos.Model.Cliente;
 import com.innovacore.ms_proyectos.Model.Proyecto;
 import com.innovacore.ms_proyectos.Repository.ClienteRepository;
@@ -15,10 +17,15 @@ public class ProyectoService {
 
     private final ProyectoRepository repository;
     private final ClienteRepository clienteRepository;
+    private final ProyectoEventPublisher eventPublisher;
 
-    public ProyectoService(ProyectoRepository repository, ClienteRepository clienteRepository) {
+    public ProyectoService(
+            ProyectoRepository repository,
+            ClienteRepository clienteRepository,
+            ProyectoEventPublisher eventPublisher) {
         this.repository = repository;
         this.clienteRepository = clienteRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     // ==========================================================
@@ -90,7 +97,22 @@ public class ProyectoService {
         if (proyecto.getPorcentajeAvance() == null) proyecto.setPorcentajeAvance(0);
         if (proyecto.getFechaCreacion() == null) proyecto.setFechaCreacion(LocalDateTime.now());
 
-        return repository.save(proyecto);
+        Proyecto proyectoGuardado = repository.save(proyecto);
+
+        // ==========================================================
+        // PUBLICAR EVENTO: PROYECTO CREADO
+        // ==========================================================
+        ProyectoCreadoEvent evento = ProyectoCreadoEvent.crear(
+                proyectoGuardado.getId(),
+                proyectoGuardado.getNombreProyecto(),
+                proyectoGuardado.getEstadoProyecto(),
+                proyectoGuardado.getPrioridad(),
+                proyectoGuardado.getIdGestor(),
+                proyectoGuardado.getCliente() != null ? proyectoGuardado.getCliente().getId() : null
+        );
+        eventPublisher.publicarProyectoCreado(evento);
+
+        return proyectoGuardado;
     }
 
     // ==========================================================
