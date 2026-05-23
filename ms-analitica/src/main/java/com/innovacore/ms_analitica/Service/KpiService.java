@@ -1,76 +1,127 @@
 package com.innovacore.ms_analitica.Service;
 
 import com.innovacore.ms_analitica.DTO.*;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Supplier;
 
 @Service
 public class KpiService {
 
     private final WebClient proyectosWebClient;
     private final WebClient recursosWebClient;
+    private final CircuitBreaker proyectosCircuitBreaker;
+    private final CircuitBreaker recursosCircuitBreaker;
 
     public KpiService(
             @Qualifier("proyectosWebClient") WebClient proyectosWebClient,
-            @Qualifier("recursosWebClient") WebClient recursosWebClient) {
+            @Qualifier("recursosWebClient") WebClient recursosWebClient,
+            CircuitBreakerRegistry circuitBreakerRegistry) {
         this.proyectosWebClient = proyectosWebClient;
         this.recursosWebClient = recursosWebClient;
+        this.proyectosCircuitBreaker = circuitBreakerRegistry.circuitBreaker("ms-proyectos");
+        this.recursosCircuitBreaker = circuitBreakerRegistry.circuitBreaker("ms-recursos");
     }
 
     // ==========================================================
     // OBTENER TODOS LOS PROYECTOS (desde ms-proyectos)
+    // CON CIRCUIT BREAKER 🛡️
     // ==========================================================
     public List<ProyectoDTO> obtenerProyectos() {
+        Supplier<List<ProyectoDTO>> supplier = CircuitBreaker.decorateSupplier(
+                proyectosCircuitBreaker,
+                () -> {
+                    try {
+                        ProyectoDTO[] proyectos = proyectosWebClient.get()
+                                .uri("/proyectos")
+                                .retrieve()
+                                .bodyToMono(ProyectoDTO[].class)
+                                .timeout(Duration.ofSeconds(5))
+                                .block();
+                        return proyectos != null ? Arrays.asList(proyectos) : new ArrayList<>();
+                    } catch (Exception e) {
+                        throw new RuntimeException("Error llamando a ms-proyectos: " + e.getMessage());
+                    }
+                }
+        );
+
         try {
-            ProyectoDTO[] proyectos = proyectosWebClient.get()
-                    .uri("/proyectos")
-                    .retrieve()
-                    .bodyToMono(ProyectoDTO[].class)
-                    .onErrorResume(e -> Mono.just(new ProyectoDTO[0]))
-                    .block();
-            return proyectos != null ? Arrays.asList(proyectos) : new ArrayList<>();
+            return supplier.get();
         } catch (Exception e) {
+            System.out.println("⚠️ Circuit Breaker activado para ms-proyectos: " + e.getMessage());
+            System.out.println("🛡️ Devolviendo lista vacía como fallback");
             return new ArrayList<>();
         }
     }
 
     // ==========================================================
     // OBTENER TODAS LAS TAREAS (desde ms-proyectos)
+    // CON CIRCUIT BREAKER 🛡️
     // ==========================================================
     public List<TareaDTO> obtenerTareas() {
+        Supplier<List<TareaDTO>> supplier = CircuitBreaker.decorateSupplier(
+                proyectosCircuitBreaker,
+                () -> {
+                    try {
+                        TareaDTO[] tareas = proyectosWebClient.get()
+                                .uri("/tareas")
+                                .retrieve()
+                                .bodyToMono(TareaDTO[].class)
+                                .timeout(Duration.ofSeconds(5))
+                                .block();
+                        return tareas != null ? Arrays.asList(tareas) : new ArrayList<>();
+                    } catch (Exception e) {
+                        throw new RuntimeException("Error llamando a ms-proyectos (tareas): " + e.getMessage());
+                    }
+                }
+        );
+
         try {
-            TareaDTO[] tareas = proyectosWebClient.get()
-                    .uri("/tareas")
-                    .retrieve()
-                    .bodyToMono(TareaDTO[].class)
-                    .onErrorResume(e -> Mono.just(new TareaDTO[0]))
-                    .block();
-            return tareas != null ? Arrays.asList(tareas) : new ArrayList<>();
+            return supplier.get();
         } catch (Exception e) {
+            System.out.println("⚠️ Circuit Breaker activado para ms-proyectos (tareas): " + e.getMessage());
+            System.out.println("🛡️ Devolviendo lista vacía como fallback");
             return new ArrayList<>();
         }
     }
 
     // ==========================================================
     // OBTENER TODOS LOS EMPLEADOS (desde ms-recursos)
+    // CON CIRCUIT BREAKER 🛡️
     // ==========================================================
     public List<EmpleadoDTO> obtenerEmpleados() {
+        Supplier<List<EmpleadoDTO>> supplier = CircuitBreaker.decorateSupplier(
+                recursosCircuitBreaker,
+                () -> {
+                    try {
+                        EmpleadoDTO[] empleados = recursosWebClient.get()
+                                .uri("/empleados")
+                                .retrieve()
+                                .bodyToMono(EmpleadoDTO[].class)
+                                .timeout(Duration.ofSeconds(5))
+                                .block();
+                        return empleados != null ? Arrays.asList(empleados) : new ArrayList<>();
+                    } catch (Exception e) {
+                        throw new RuntimeException("Error llamando a ms-recursos: " + e.getMessage());
+                    }
+                }
+        );
+
         try {
-            EmpleadoDTO[] empleados = recursosWebClient.get()
-                    .uri("/empleados")
-                    .retrieve()
-                    .bodyToMono(EmpleadoDTO[].class)
-                    .onErrorResume(e -> Mono.just(new EmpleadoDTO[0]))
-                    .block();
-            return empleados != null ? Arrays.asList(empleados) : new ArrayList<>();
+            return supplier.get();
         } catch (Exception e) {
+            System.out.println("⚠️ Circuit Breaker activado para ms-recursos: " + e.getMessage());
+            System.out.println("🛡️ Devolviendo lista vacía como fallback");
             return new ArrayList<>();
         }
     }
