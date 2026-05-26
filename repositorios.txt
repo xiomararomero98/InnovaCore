@@ -1,0 +1,16 @@
+
+
+Repositorio principal del proyecto:
+https://github.com/xiomararomero98/InnovaCore
+
+Descripción:
+Repositorio que contiene la solución InnovaCore, plataforma basada en microservicios para la gestión de proyectos, recursos humanos y analítica.
+
+Componentes incluidos:
+- innovacore-frontend: Frontend desarrollado con React, TypeScript y Vite.
+- api-gateway: Componente que actúa como Gateway/BFF entre el frontend y los microservicios.
+- eureka-server: Servidor de descubrimiento de servicios.
+- ms-proyectos: Microservicio para gestión de proyectos.
+- ms-recursos: Microservicio para gestión de recursos humanos.
+- ms-analitica: Microservicio para indicadores y métricas KPI.
+- ms-seguridad: Microservicio para autenticación y usuarios.
