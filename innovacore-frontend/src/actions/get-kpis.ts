@@ -7,6 +7,6 @@ export async function getKpis(): Promise<Kpi[]> {
 }
 
 export async function getDashboard(): Promise<Dashboard> {
-  const response = await api.get("/analitica/dashboard");
+  const response = await api.get("/analitica/kpis/dashboard");
   return response.data;
 }
