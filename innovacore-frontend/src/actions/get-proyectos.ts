@@ -15,3 +15,15 @@ export async function crearProyecto(proyecto: Partial<Proyecto>): Promise<Proyec
   const response = await api.post("/proyectos-api/proyectos", proyecto);
   return response.data;
 }
+
+export async function actualizarProyecto(
+  id: number,
+  proyecto: Partial<Proyecto>
+): Promise<Proyecto> {
+  const response = await api.put(`/proyectos-api/proyectos/${id}`, proyecto);
+  return response.data;
+}
+
+export async function eliminarProyecto(id: number): Promise<void> {
+  await api.delete(`/proyectos-api/proyectos/${id}`);
+}
