@@ -5,6 +5,7 @@ import com.innovacore.ms_proyectos.Model.Tarea;
 import com.innovacore.ms_proyectos.Repository.ProyectoRepository;
 import com.innovacore.ms_proyectos.Repository.TareaRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -16,43 +17,31 @@ public class TareaService {
     private final TareaRepository repository;
     private final ProyectoRepository proyectoRepository;
 
+    @Autowired
+    private ProyectoService proyectoService;
+
     public TareaService(TareaRepository repository, ProyectoRepository proyectoRepository) {
         this.repository = repository;
         this.proyectoRepository = proyectoRepository;
     }
 
-    // ==========================================================
-    // LISTAR TODAS
-    // ==========================================================
     public List<Tarea> getAll() {
         return repository.findAll();
     }
 
-    // ==========================================================
-    // BUSCAR POR ID
-    // ==========================================================
     public Tarea getById(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tarea no encontrada con id: " + id));
     }
 
-    // ==========================================================
-    // LISTAR POR PROYECTO
-    // ==========================================================
     public List<Tarea> getByProyecto(Long idProyecto) {
         return repository.findByProyectoId(idProyecto);
     }
 
-    // ==========================================================
-    // LISTAR POR RESPONSABLE
-    // ==========================================================
     public List<Tarea> getByResponsable(Long idResponsable) {
         return repository.findByIdResponsable(idResponsable);
     }
 
-    // ==========================================================
-    // VALIDACIONES
-    // ==========================================================
     private void validar(Tarea tarea) {
         if (tarea.getNombreTarea() == null || tarea.getNombreTarea().isBlank())
             throw new RuntimeException("El nombre de la tarea es obligatorio");
@@ -67,28 +56,45 @@ public class TareaService {
     }
 
     // ==========================================================
-    // CREAR TAREA
+    // REGLA DE NEGOCIO: el avance de la tarea depende de su estado
+    // PENDIENTE = 0%, EN_PROGRESO = 50%, COMPLETADA = 100%, CANCELADA = 0%
     // ==========================================================
+    private int calcularAvancePorEstado(String estado) {
+        if (estado == null) return 0;
+        return switch (estado.toUpperCase()) {
+            case "COMPLETADA" -> 100;
+            case "EN_PROGRESO" -> 50;
+            default -> 0; // PENDIENTE, CANCELADA
+        };
+    }
+
     public Tarea create(Tarea tarea) {
         validar(tarea);
 
+        Long idProyecto = null;
         if (tarea.getProyecto() != null && tarea.getProyecto().getId() != null) {
             Proyecto proyecto = proyectoRepository.findById(tarea.getProyecto().getId())
                     .orElseThrow(() -> new RuntimeException("Proyecto no encontrado"));
             tarea.setProyecto(proyecto);
+            idProyecto = proyecto.getId();
         }
 
         if (tarea.getEstadoTarea() == null) tarea.setEstadoTarea("PENDIENTE");
         if (tarea.getPrioridad() == null) tarea.setPrioridad("MEDIA");
-        if (tarea.getPorcentajeAvance() == null) tarea.setPorcentajeAvance(0);
+        // El avance se calcula automáticamente según el estado
+        tarea.setPorcentajeAvance(calcularAvancePorEstado(tarea.getEstadoTarea()));
         if (tarea.getFechaCreacion() == null) tarea.setFechaCreacion(LocalDateTime.now());
 
-        return repository.save(tarea);
+        Tarea tareaGuardada = repository.save(tarea);
+
+        // Recalcular avance y estado del proyecto
+        if (idProyecto != null) {
+            proyectoService.recalcularAvanceYEstado(idProyecto);
+        }
+
+        return tareaGuardada;
     }
 
-    // ==========================================================
-    // ACTUALIZAR TAREA
-    // ==========================================================
     public Tarea update(Long id, Tarea tarea) {
         Tarea dbTarea = getById(id);
         validar(tarea);
@@ -99,29 +105,44 @@ public class TareaService {
         dbTarea.setFechaLimite(tarea.getFechaLimite());
         dbTarea.setEstadoTarea(tarea.getEstadoTarea());
         dbTarea.setPrioridad(tarea.getPrioridad());
-        dbTarea.setPorcentajeAvance(tarea.getPorcentajeAvance());
+        // El avance se recalcula automáticamente según el estado
+        dbTarea.setPorcentajeAvance(calcularAvancePorEstado(tarea.getEstadoTarea()));
         dbTarea.setIdResponsable(tarea.getIdResponsable());
 
-        return repository.save(dbTarea);
+        Tarea tareaActualizada = repository.save(dbTarea);
+
+        // Recalcular avance y estado del proyecto
+        if (dbTarea.getProyecto() != null) {
+            proyectoService.recalcularAvanceYEstado(dbTarea.getProyecto().getId());
+        }
+
+        return tareaActualizada;
     }
 
-    // ==========================================================
-    // ELIMINAR TAREA
-    // ==========================================================
     public void delete(Long id) {
-        if (!repository.existsById(id))
-            throw new RuntimeException("No existe una tarea con id: " + id);
+        Tarea tarea = getById(id);
+        Long idProyecto = tarea.getProyecto() != null ? tarea.getProyecto().getId() : null;
+
         repository.deleteById(id);
+
+        if (idProyecto != null) {
+            proyectoService.recalcularAvanceYEstado(idProyecto);
+        }
     }
 
     // ==========================================================
-    // ACTUALIZAR AVANCE
+    // CAMBIAR ESTADO (recalcula avance automáticamente)
     // ==========================================================
-    public Tarea actualizarAvance(Long id, Integer porcentaje) {
-        if (porcentaje < 0 || porcentaje > 100)
-            throw new RuntimeException("El porcentaje debe estar entre 0 y 100");
+    public Tarea cambiarEstado(Long id, String nuevoEstado) {
         Tarea tarea = getById(id);
-        tarea.setPorcentajeAvance(porcentaje);
-        return repository.save(tarea);
+        tarea.setEstadoTarea(nuevoEstado);
+        tarea.setPorcentajeAvance(calcularAvancePorEstado(nuevoEstado));
+        Tarea actualizada = repository.save(tarea);
+
+        if (tarea.getProyecto() != null) {
+            proyectoService.recalcularAvanceYEstado(tarea.getProyecto().getId());
+        }
+
+        return actualizada;
     }
 }

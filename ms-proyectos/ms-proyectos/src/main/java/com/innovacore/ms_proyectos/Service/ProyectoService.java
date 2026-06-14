@@ -4,10 +4,13 @@ import com.innovacore.ms_proyectos.Event.ProyectoCreadoEvent;
 import com.innovacore.ms_proyectos.Event.ProyectoEventPublisher;
 import com.innovacore.ms_proyectos.Model.Cliente;
 import com.innovacore.ms_proyectos.Model.Proyecto;
+import com.innovacore.ms_proyectos.Model.Tarea;
 import com.innovacore.ms_proyectos.Repository.ClienteRepository;
 import com.innovacore.ms_proyectos.Repository.ProyectoRepository;
+import com.innovacore.ms_proyectos.Repository.TareaRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -17,56 +20,41 @@ public class ProyectoService {
 
     private final ProyectoRepository repository;
     private final ClienteRepository clienteRepository;
+    private final TareaRepository tareaRepository;
     private final ProyectoEventPublisher eventPublisher;
 
     public ProyectoService(
             ProyectoRepository repository,
             ClienteRepository clienteRepository,
+            TareaRepository tareaRepository,
             ProyectoEventPublisher eventPublisher) {
         this.repository = repository;
         this.clienteRepository = clienteRepository;
+        this.tareaRepository = tareaRepository;
         this.eventPublisher = eventPublisher;
     }
 
-    // ==========================================================
-    // LISTAR TODOS
-    // ==========================================================
     public List<Proyecto> getAll() {
         return repository.findAll();
     }
 
-    // ==========================================================
-    // BUSCAR POR ID
-    // ==========================================================
     public Proyecto getById(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Proyecto no encontrado con id: " + id));
     }
 
-    // ==========================================================
-    // LISTAR POR CLIENTE
-    // ==========================================================
     public List<Proyecto> getByCliente(Long idCliente) {
         return repository.findByClienteId(idCliente);
     }
 
-    // ==========================================================
-    // LISTAR POR ESTADO
-    // ==========================================================
     public List<Proyecto> getByEstado(String estado) {
         return repository.findByEstadoProyecto(estado);
     }
 
-    // ==========================================================
-    // LISTAR POR GESTOR
-    // ==========================================================
     public List<Proyecto> getByGestor(Long idGestor) {
         return repository.findByIdGestor(idGestor);
     }
 
-    // ==========================================================
-    // VALIDACIONES
-    // ==========================================================
     private void validar(Proyecto proyecto) {
         if (proyecto.getNombreProyecto() == null || proyecto.getNombreProyecto().isBlank())
             throw new RuntimeException("El nombre del proyecto es obligatorio");
@@ -80,9 +68,6 @@ public class ProyectoService {
             throw new RuntimeException("El gestor es obligatorio");
     }
 
-    // ==========================================================
-    // CREAR PROYECTO
-    // ==========================================================
     public Proyecto create(Proyecto proyecto) {
         validar(proyecto);
 
@@ -92,16 +77,14 @@ public class ProyectoService {
             proyecto.setCliente(cliente);
         }
 
-        if (proyecto.getEstadoProyecto() == null) proyecto.setEstadoProyecto("PLANIFICADO");
+        // El proyecto siempre empieza en PLANIFICADO con 0% (sin tareas)
+        proyecto.setEstadoProyecto("PLANIFICADO");
         if (proyecto.getPrioridad() == null) proyecto.setPrioridad("MEDIA");
-        if (proyecto.getPorcentajeAvance() == null) proyecto.setPorcentajeAvance(0);
+        proyecto.setPorcentajeAvance(0);
         if (proyecto.getFechaCreacion() == null) proyecto.setFechaCreacion(LocalDateTime.now());
 
         Proyecto proyectoGuardado = repository.save(proyecto);
 
-        // ==========================================================
-        // PUBLICAR EVENTO: PROYECTO CREADO
-        // ==========================================================
         ProyectoCreadoEvent evento = ProyectoCreadoEvent.crear(
                 proyectoGuardado.getId(),
                 proyectoGuardado.getNombreProyecto(),
@@ -115,9 +98,6 @@ public class ProyectoService {
         return proyectoGuardado;
     }
 
-    // ==========================================================
-    // ACTUALIZAR PROYECTO
-    // ==========================================================
     public Proyecto update(Long id, Proyecto proyecto) {
         Proyecto dbProyecto = getById(id);
         validar(proyecto);
@@ -126,9 +106,7 @@ public class ProyectoService {
         dbProyecto.setDescripcion(proyecto.getDescripcion());
         dbProyecto.setFechaInicio(proyecto.getFechaInicio());
         dbProyecto.setFechaFin(proyecto.getFechaFin());
-        dbProyecto.setEstadoProyecto(proyecto.getEstadoProyecto());
         dbProyecto.setPrioridad(proyecto.getPrioridad());
-        dbProyecto.setPorcentajeAvance(proyecto.getPorcentajeAvance());
         dbProyecto.setIdGestor(proyecto.getIdGestor());
 
         if (proyecto.getCliente() != null && proyecto.getCliente().getId() != null) {
@@ -137,12 +115,11 @@ public class ProyectoService {
             dbProyecto.setCliente(cliente);
         }
 
-        return repository.save(dbProyecto);
+        Proyecto guardado = repository.save(dbProyecto);
+        // Recalcular avance y estado después de actualizar
+        return recalcularAvanceYEstado(guardado.getId());
     }
 
-    // ==========================================================
-    // ELIMINAR PROYECTO
-    // ==========================================================
     public void delete(Long id) {
         if (!repository.existsById(id))
             throw new RuntimeException("No existe un proyecto con id: " + id);
@@ -150,13 +127,81 @@ public class ProyectoService {
     }
 
     // ==========================================================
-    // ACTUALIZAR AVANCE
+    // REGLA DE NEGOCIO: recalcula avance y estado del proyecto
+    // automáticamente según sus tareas y fechas
     // ==========================================================
-    public Proyecto actualizarAvance(Long id, Integer porcentaje) {
-        if (porcentaje < 0 || porcentaje > 100)
-            throw new RuntimeException("El porcentaje debe estar entre 0 y 100");
-        Proyecto proyecto = getById(id);
-        proyecto.setPorcentajeAvance(porcentaje);
+    public Proyecto recalcularAvanceYEstado(Long idProyecto) {
+        Proyecto proyecto = getById(idProyecto);
+        List<Tarea> tareas = tareaRepository.findByProyectoId(idProyecto);
+
+        // 1. Calcular % de avance promedio
+        int avance = 0;
+        if (!tareas.isEmpty()) {
+            int suma = tareas.stream()
+                    .mapToInt(t -> t.getPorcentajeAvance() != null ? t.getPorcentajeAvance() : 0)
+                    .sum();
+            avance = suma / tareas.size();
+        }
+        proyecto.setPorcentajeAvance(avance);
+
+        // 2. Calcular estado automáticamente
+        String estado = calcularEstado(proyecto, tareas);
+        proyecto.setEstadoProyecto(estado);
+
         return repository.save(proyecto);
+    }
+
+    /**
+     * Determina el estado del proyecto según sus tareas y fechas:
+     *  - FINALIZADO: todas las tareas COMPLETADAS
+     *  - ATRASADO: fecha fin pasada y no está finalizado
+     *  - EN_CURSO: al menos una tarea en progreso o completada
+     *  - PLANIFICADO: no tiene tareas o todas pendientes
+     */
+    private String calcularEstado(Proyecto proyecto, List<Tarea> tareas) {
+        LocalDate hoy = LocalDate.now();
+
+        // Sin tareas → PLANIFICADO (o ATRASADO si ya pasó la fecha fin)
+        if (tareas.isEmpty()) {
+            if (proyecto.getFechaFin() != null && proyecto.getFechaFin().isBefore(hoy)) {
+                return "ATRASADO";
+            }
+            return "PLANIFICADO";
+        }
+
+        long completadas = tareas.stream()
+                .filter(t -> "COMPLETADA".equalsIgnoreCase(t.getEstadoTarea()))
+                .count();
+
+        // Todas COMPLETADAS → FINALIZADO
+        if (completadas == tareas.size()) {
+            return "FINALIZADO";
+        }
+
+        // Fecha fin pasada y no terminado → ATRASADO
+        if (proyecto.getFechaFin() != null && proyecto.getFechaFin().isBefore(hoy)) {
+            return "ATRASADO";
+        }
+
+        // Hay tareas en progreso o completadas (pero no todas) → EN_CURSO
+        long activas = tareas.stream()
+                .filter(t -> {
+                    String e = t.getEstadoTarea();
+                    return "EN_PROGRESO".equalsIgnoreCase(e) || "COMPLETADA".equalsIgnoreCase(e);
+                })
+                .count();
+
+        if (activas > 0) {
+            return "EN_CURSO";
+        }
+
+        // Todas pendientes o canceladas
+        return "PLANIFICADO";
+    }
+
+    public Proyecto actualizarAvance(Long id, Integer porcentaje) {
+        // Ahora el avance se calcula automáticamente, pero mantenemos el endpoint
+        // por compatibilidad. Llama al recálculo.
+        return recalcularAvanceYEstado(id);
     }
 }

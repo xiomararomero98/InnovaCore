@@ -44,8 +44,6 @@ public class TareaController {
         return ResponseEntity.ok(service.getByResponsable(idResponsable));
     }
 
-    
-
     @Operation(summary = "Crear tarea")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Tarea creada correctamente"),
@@ -62,12 +60,16 @@ public class TareaController {
         return ResponseEntity.ok(service.update(id, tarea));
     }
 
-    @Operation(summary = "Actualizar avance de tarea")
-    @PutMapping("/{id}/avance/{porcentaje}")
-    public ResponseEntity<Tarea> actualizarAvance(
+    @Operation(
+        summary = "Cambiar estado de la tarea",
+        description = "Cambia el estado (PENDIENTE/EN_PROGRESO/COMPLETADA/CANCELADA). " +
+                      "El avance se recalcula automáticamente y el proyecto también."
+    )
+    @PutMapping("/{id}/estado/{nuevoEstado}")
+    public ResponseEntity<Tarea> cambiarEstado(
             @PathVariable Long id,
-            @PathVariable Integer porcentaje) {
-        return ResponseEntity.ok(service.actualizarAvance(id, porcentaje));
+            @PathVariable String nuevoEstado) {
+        return ResponseEntity.ok(service.cambiarEstado(id, nuevoEstado));
     }
 
     @Operation(summary = "Eliminar tarea")
