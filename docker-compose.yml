@@ -10,7 +10,7 @@ services:
       RABBITMQ_DEFAULT_PASS: admin1234
 
   db_seguridad:
-    image: mysql:8.4
+    image: mysql:8.0
     container_name: db_seguridad
     ports:
       - "3307:3306"
@@ -19,7 +19,7 @@ services:
       MYSQL_DATABASE: db_seguridad
 
   db_proyectos:
-    image: mysql:8.4
+    image: mysql:8.0
     container_name: db_proyectos
     ports:
       - "3308:3306"
@@ -28,7 +28,7 @@ services:
       MYSQL_DATABASE: db_proyectos
 
   db_recursos:
-    image: mysql:8.4
+    image: mysql:8.0
     container_name: db_recursos
     ports:
       - "3309:3306"
@@ -37,7 +37,7 @@ services:
       MYSQL_DATABASE: db_recursos
 
   db_analitica:
-    image: mysql:8.4
+    image: mysql:8.0
     container_name: db_analitica
     ports:
       - "3310:3306"
