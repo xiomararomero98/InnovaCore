@@ -17,38 +17,23 @@ public class EmpleadoService {
         this.repository = repository;
     }
 
-    // ==========================================================
-    // LISTAR TODOS
-    // ==========================================================
     public List<Empleado> getAll() {
         return repository.findAll();
     }
 
-    // ==========================================================
-    // BUSCAR POR ID
-    // ==========================================================
     public Empleado getById(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado con id: " + id));
     }
 
-    // ==========================================================
-    // LISTAR POR ESPECIALIDAD
-    // ==========================================================
     public List<Empleado> getByEspecialidad(String especialidad) {
         return repository.findByEspecialidad(especialidad);
     }
 
-    // ==========================================================
-    // LISTAR POR DISPONIBILIDAD
-    // ==========================================================
     public List<Empleado> getByDisponibilidad(String disponibilidad) {
         return repository.findByDisponibilidad(disponibilidad);
     }
 
-    // ==========================================================
-    // VALIDACIONES
-    // ==========================================================
     private void validar(Empleado empleado) {
         if (empleado.getNombre() == null || empleado.getNombre().isBlank())
             throw new RuntimeException("El nombre es obligatorio");
@@ -62,9 +47,6 @@ public class EmpleadoService {
             throw new RuntimeException("La especialidad es obligatoria");
     }
 
-    // ==========================================================
-    // CREAR EMPLEADO
-    // ==========================================================
     public Empleado create(Empleado empleado) {
         validar(empleado);
 
@@ -78,9 +60,6 @@ public class EmpleadoService {
         return repository.save(empleado);
     }
 
-    // ==========================================================
-    // ACTUALIZAR EMPLEADO
-    // ==========================================================
     public Empleado update(Long id, Empleado empleado) {
         Empleado dbEmpleado = getById(id);
         validar(empleado);
@@ -91,23 +70,20 @@ public class EmpleadoService {
         dbEmpleado.setCargo(empleado.getCargo());
         dbEmpleado.setEspecialidad(empleado.getEspecialidad());
         dbEmpleado.setDisponibilidad(empleado.getDisponibilidad());
-        dbEmpleado.setEstado(empleado.getEstado());
+        // FIX: preservar estado existente si el request no lo envía
+        if (empleado.getEstado() != null) {
+            dbEmpleado.setEstado(empleado.getEstado());
+        }
 
         return repository.save(dbEmpleado);
     }
 
-    // ==========================================================
-    // ELIMINAR (desactivar)
-    // ==========================================================
     public void delete(Long id) {
         Empleado empleado = getById(id);
         empleado.setEstado(0);
         repository.save(empleado);
     }
 
-    // ==========================================================
-    // CAMBIAR DISPONIBILIDAD
-    // ==========================================================
     public Empleado cambiarDisponibilidad(Long id, String disponibilidad) {
         Empleado empleado = getById(id);
         empleado.setDisponibilidad(disponibilidad);

@@ -13,8 +13,18 @@ import {
   eliminarTarea,
   getTareasByProyecto,
 } from "../actions/get-tareas";
+import {
+  getAsignacionesByProyecto,
+  getAsignacionesByTarea,
+  asignarEmpleadosAProyecto,
+  asignarEmpleadosATarea,
+  finalizarAsignacion,
+  type Asignacion,
+} from "../actions/get-asignaciones";
+import { getEmpleados } from "../actions/get-empleados";
 import type { Proyecto } from "../interfaces/proyecto.interface";
 import type { Tarea } from "../interfaces/tarea.interface";
+import type { Empleado } from "../interfaces/empleado.interface";
 import { puedeGestionarProyectos } from "../utils/auth";
 
 type TareaForm = {
@@ -32,11 +42,152 @@ const initialTareaForm: TareaForm = {
   fechaInicio: "",
   fechaLimite: "",
   prioridad: "MEDIA",
-  idResponsable: "1",
+  idResponsable: "",
 };
 
 const estadosTarea = ["PENDIENTE", "EN_PROGRESO", "COMPLETADA", "CANCELADA"];
 
+// ============================================================
+// MODAL DE ASIGNACIÓN (reutilizable para proyecto y tarea)
+// ============================================================
+type AsignacionModalProps = {
+  titulo: string;
+  empleados: Empleado[];
+  asignacionesActivas: Asignacion[];
+  onGuardar: (empleadosIds: number[], horas: number, rol: string) => Promise<void>;
+  onCerrar: () => void;
+};
+
+function AsignacionModal({
+  titulo,
+  empleados,
+  asignacionesActivas,
+  onGuardar,
+  onCerrar,
+}: AsignacionModalProps) {
+  const [seleccionados, setSeleccionados] = useState<number[]>([]);
+  const [horas, setHoras] = useState("8");
+  const [rol, setRol] = useState("DESARROLLADOR");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  const idsYaAsignados = asignacionesActivas
+    .filter((a) => a.estado === "ACTIVA")
+    .map((a) => a.empleado.id);
+
+  const toggleEmpleado = (id: number) => {
+    setSeleccionados((prev) =>
+      prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id]
+    );
+  };
+
+  const handleGuardar = async () => {
+    if (seleccionados.length === 0) {
+      setError("Selecciona al menos un empleado.");
+      return;
+    }
+    if (!horas || Number(horas) <= 0) {
+      setError("Las horas deben ser mayores a 0.");
+      return;
+    }
+    try {
+      setGuardando(true);
+      setError("");
+      await onGuardar(seleccionados, Number(horas), rol);
+      onCerrar();
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "No se pudo realizar la asignación.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-box">
+        <h3 className="form-title">{titulo}</h3>
+
+        {error && <div className="error-message">{error}</div>}
+
+        <div className="form-grid" style={{ marginBottom: 16 }}>
+          <div className="form-group">
+            <label>Horas asignadas</label>
+            <input
+              type="number"
+              min="1"
+              value={horas}
+              onChange={(e) => setHoras(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label>Rol en el proyecto</label>
+            <select value={rol} onChange={(e) => setRol(e.target.value)}>
+              <option value="DESARROLLADOR">DESARROLLADOR</option>
+              <option value="LIDER_TECNICO">LÍDER TÉCNICO</option>
+              <option value="ANALISTA">ANALISTA</option>
+              <option value="TESTER">TESTER</option>
+              <option value="DISEÑADOR">DISEÑADOR</option>
+            </select>
+          </div>
+        </div>
+
+        <p style={{ fontWeight: 600, marginBottom: 8, color: "var(--azul-oscuro)" }}>
+          Selecciona empleados:
+        </p>
+
+        <div className="empleados-lista">
+          {empleados.map((e) => {
+            const yaAsignado = idsYaAsignados.includes(e.id);
+            const marcado = seleccionados.includes(e.id);
+            return (
+              <label
+                key={e.id}
+                className={`empleado-item ${yaAsignado ? "empleado-ya-asignado" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={marcado}
+                  disabled={yaAsignado}
+                  onChange={() => toggleEmpleado(e.id)}
+                />
+                <span>
+                  <strong>{e.nombre} {e.apellido}</strong>
+                  {" · "}{e.cargo}
+                  {" · "}
+                  <span className={`badge badge-${e.disponibilidad.toLowerCase()}`}>
+                    {e.disponibilidad}
+                  </span>
+                  {yaAsignado && (
+                    <span style={{ color: "var(--gris-oscuro)", fontSize: 11, marginLeft: 6 }}>
+                      (ya asignado)
+                    </span>
+                  )}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+
+        <div className="form-actions" style={{ marginTop: 16 }}>
+          <button
+            className="btn-primary btn-auto"
+            onClick={handleGuardar}
+            disabled={guardando}
+          >
+            {guardando ? "Asignando..." : "Asignar"}
+          </button>
+          <button className="btn-secondary" onClick={onCerrar}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// PÁGINA PRINCIPAL
+// ============================================================
 export default function DetalleProyectoPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -45,24 +196,46 @@ export default function DetalleProyectoPage() {
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [tareas, setTareas] = useState<Tarea[]>([]);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [asignacionesProyecto, setAsignacionesProyecto] = useState<Asignacion[]>([]);
+  const [asignacionesTarea, setAsignacionesTarea] = useState<Record<number, Asignacion[]>>({});
+
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [form, setForm] = useState<TareaForm>(initialTareaForm);
   const [error, setError] = useState("");
 
+  // Modal de asignación
+  const [modalProyecto, setModalProyecto] = useState(false);
+  const [modalTareaId, setModalTareaId] = useState<number | null>(null);
+
   const cargarDetalle = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      const [proyectoData, tareasData] = await Promise.all([
+      const [proyectoData, tareasData, empleadosData, asignProyecto] = await Promise.all([
         getProyectoById(idProyecto),
         getTareasByProyecto(idProyecto),
+        getEmpleados(),
+        getAsignacionesByProyecto(idProyecto),
       ]);
 
       setProyecto(proyectoData);
       setTareas(tareasData);
+      setEmpleados(empleadosData);
+      setAsignacionesProyecto(asignProyecto);
+
+      // Cargar asignaciones por tarea
+      const asignPorTarea: Record<number, Asignacion[]> = {};
+      await Promise.all(
+        tareasData.map(async (t) => {
+          const asign = await getAsignacionesByTarea(t.id);
+          asignPorTarea[t.id] = asign;
+        })
+      );
+      setAsignacionesTarea(asignPorTarea);
     } catch (error) {
       console.error("Error cargando detalle del proyecto:", error);
       setError("No se pudo cargar el detalle del proyecto.");
@@ -77,34 +250,36 @@ export default function DetalleProyectoPage() {
     }
   }, [idProyecto, cargarDetalle]);
 
+  // ── Formulario tarea ──
   const handleChange = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = event.target;
-
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const limpiarFormulario = () => {
-    setForm(initialTareaForm);
+    setForm({
+      ...initialTareaForm,
+      idResponsable: empleados.length > 0 ? String(empleados[0].id) : "",
+    });
     setMostrarFormulario(false);
+  };
+
+  const abrirFormulario = () => {
+    setForm({
+      ...initialTareaForm,
+      idResponsable: empleados.length > 0 ? String(empleados[0].id) : "",
+    });
+    setMostrarFormulario(true);
   };
 
   const handleCrearTarea = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (!puedeGestionar) {
-      setError("No tienes permisos para crear tareas.");
-      return;
-    }
-
+    if (!puedeGestionar) { setError("No tienes permisos para crear tareas."); return; }
     try {
       setGuardando(true);
       setError("");
-
       await crearTarea({
         nombreTarea: form.nombreTarea,
         descripcion: form.descripcion,
@@ -112,15 +287,11 @@ export default function DetalleProyectoPage() {
         fechaLimite: form.fechaLimite,
         prioridad: form.prioridad,
         idResponsable: Number(form.idResponsable),
-        proyecto: {
-          id: idProyecto,
-        },
+        proyecto: { id: idProyecto },
       });
-
       limpiarFormulario();
       await cargarDetalle();
     } catch (error) {
-      console.error("Error creando tarea:", error);
       setError("No se pudo crear la tarea. Revisa las fechas y el responsable.");
     } finally {
       setGuardando(false);
@@ -128,132 +299,191 @@ export default function DetalleProyectoPage() {
   };
 
   const handleCambiarEstado = async (idTarea: number, nuevoEstado: string) => {
-    if (!puedeGestionar) {
-      setError("No tienes permisos para cambiar el estado de tareas.");
-      return;
-    }
-
+    if (!puedeGestionar) { setError("No tienes permisos para cambiar el estado de tareas."); return; }
     try {
       setError("");
       await cambiarEstadoTarea(idTarea, nuevoEstado);
       await cargarDetalle();
-    } catch (error) {
-      console.error("Error cambiando estado de tarea:", error);
+    } catch {
       setError("No se pudo cambiar el estado de la tarea.");
     }
   };
 
   const handleEliminarTarea = async (idTarea: number) => {
-    if (!puedeGestionar) {
-      setError("No tienes permisos para eliminar tareas.");
-      return;
-    }
-
-    const confirmar = window.confirm("¿Seguro que deseas eliminar esta tarea?");
-    if (!confirmar) return;
-
+    if (!puedeGestionar) { setError("No tienes permisos para eliminar tareas."); return; }
+    if (!window.confirm("¿Seguro que deseas eliminar esta tarea?")) return;
     try {
       setError("");
       await eliminarTarea(idTarea);
       await cargarDetalle();
-    } catch (error) {
-      console.error("Error eliminando tarea:", error);
+    } catch {
       setError("No se pudo eliminar la tarea.");
     }
   };
 
-  const getBadgeClass = (valor: string) => {
-    return `badge badge-${valor.toLowerCase().replace("_", "-")}`;
+  const handleFinalizarAsignacion = async (idAsignacion: number) => {
+    try {
+      await finalizarAsignacion(idAsignacion);
+      await cargarDetalle();
+    } catch {
+      setError("No se pudo finalizar la asignación.");
+    }
   };
 
+  const getBadgeClass = (valor: string) =>
+    `badge badge-${valor.toLowerCase().replace(/_/g, "-")}`;
+
   if (Number.isNaN(idProyecto)) {
-    return (
-      <div className="page-container">
-        <div className="error-message">El ID del proyecto no es válido.</div>
-      </div>
-    );
+    return <div className="page-container"><div className="error-message">El ID del proyecto no es válido.</div></div>;
   }
+  if (loading) return <div className="loading">Cargando detalle del proyecto...</div>;
+  if (!proyecto) return <div className="page-container"><div className="error-message">Proyecto no encontrado.</div></div>;
 
-  if (loading) {
-    return <div className="loading">Cargando detalle del proyecto...</div>;
-  }
-
-  if (!proyecto) {
-    return (
-      <div className="page-container">
-        <div className="error-message">Proyecto no encontrado.</div>
-      </div>
-    );
-  }
+  const asignacionesActivas = asignacionesProyecto.filter((a) => a.estado === "ACTIVA");
 
   return (
     <div className="page-container">
+      {/* Modal asignación a proyecto */}
+      {modalProyecto && (
+        <AsignacionModal
+          titulo={`Asignar empleados a: ${proyecto.nombreProyecto}`}
+          empleados={empleados}
+          asignacionesActivas={asignacionesProyecto}
+          onGuardar={(ids, horas, rol) =>
+            asignarEmpleadosAProyecto(idProyecto, { empleadosIds: ids, horasAsignadas: horas, rolEnProyecto: rol })
+              .then(() => cargarDetalle())
+          }
+          onCerrar={() => setModalProyecto(false)}
+        />
+      )}
+
+      {/* Modal asignación a tarea */}
+      {modalTareaId !== null && (
+        <AsignacionModal
+          titulo={`Asignar empleados a tarea: ${tareas.find((t) => t.id === modalTareaId)?.nombreTarea}`}
+          empleados={empleados}
+          asignacionesActivas={asignacionesTarea[modalTareaId] || []}
+          onGuardar={(ids, horas, rol) =>
+            asignarEmpleadosATarea(idProyecto, modalTareaId, { empleadosIds: ids, horasAsignadas: horas, rolEnProyecto: rol })
+              .then(() => cargarDetalle())
+          }
+          onCerrar={() => setModalTareaId(null)}
+        />
+      )}
+
       <div className="form-actions">
-        <button
-          className="btn-secondary btn-auto"
-          onClick={() => navigate("/proyectos")}
-        >
+        <button className="btn-secondary btn-auto" onClick={() => navigate("/proyectos")}>
           ← Volver a proyectos
         </button>
-
-        <button
-          className="btn-secondary btn-auto"
-          onClick={() => navigate("/dashboard")}
-        >
+        <button className="btn-secondary btn-auto" onClick={() => navigate("/dashboard")}>
           Volver al dashboard
         </button>
       </div>
 
       <h1 className="page-title">{proyecto.nombreProyecto}</h1>
       <p className="page-subtitle">
-        Detalle del proyecto, tareas asociadas y recálculo automático del avance.
+        Detalle del proyecto, tareas y asignaciones de empleados.
       </p>
 
       {!puedeGestionar && (
         <div className="info-message">
-          Estás en modo solo lectura. Puedes revisar las tareas, el avance y el
-          estado del proyecto, pero no modificar información.
+          Estás en modo solo lectura. Puedes revisar las tareas, el avance y el estado del proyecto, pero no modificar información.
         </div>
       )}
 
       {error && <div className="error-message">{error}</div>}
 
+      {/* KPIs */}
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-title">Estado automático</div>
           <div className="kpi-value small-kpi">
-            <span className={getBadgeClass(proyecto.estadoProyecto)}>
-              {proyecto.estadoProyecto}
-            </span>
+            <span className={getBadgeClass(proyecto.estadoProyecto)}>{proyecto.estadoProyecto}</span>
           </div>
           <div className="kpi-description">Calculado según tareas y fecha fin</div>
         </div>
-
         <div className="kpi-card">
           <div className="kpi-title">Avance automático</div>
           <div className="kpi-value">{proyecto.porcentajeAvance}%</div>
-          <div className="kpi-description">
-            Promedio del avance real de las tareas
-          </div>
+          <div className="kpi-description">Promedio del avance real de las tareas</div>
         </div>
-
         <div className="kpi-card">
           <div className="kpi-title">Tareas registradas</div>
           <div className="kpi-value">{tareas.length}</div>
-          <div className="kpi-description">
-            Trabajo definido hasta este momento
-          </div>
+          <div className="kpi-description">Trabajo definido hasta este momento</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-title">Empleados asignados</div>
+          <div className="kpi-value">{asignacionesActivas.length}</div>
+          <div className="kpi-description">Con asignación activa en este proyecto</div>
         </div>
       </div>
 
+      {/* ════ ASIGNACIONES AL PROYECTO ════ */}
+      <div className="table-container">
+        <div className="table-header">
+          <h2>Equipo del proyecto</h2>
+          {puedeGestionar && (
+            <button className="btn-secondary" onClick={() => setModalProyecto(true)}>
+              + Asignar empleados
+            </button>
+          )}
+        </div>
+
+        {asignacionesProyecto.length === 0 ? (
+          <div className="empty-state">
+            <h3>No hay empleados asignados a este proyecto</h3>
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Empleado</th>
+                <th>Rol</th>
+                <th>Horas</th>
+                <th>Estado asignación</th>
+                {puedeGestionar && <th>Acciones</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {asignacionesProyecto.map((a) => (
+                <tr key={a.id}>
+                  <td>
+                    <strong>{a.empleado.nombre} {a.empleado.apellido}</strong>
+                    <div className="row-hint">{a.empleado.cargo}</div>
+                  </td>
+                  <td>{a.rolEnProyecto}</td>
+                  <td>{a.horasAsignadas}h</td>
+                  <td>
+                    <span className={getBadgeClass(a.estado)}>{a.estado}</span>
+                  </td>
+                  {puedeGestionar && (
+                    <td>
+                      {a.estado === "ACTIVA" && (
+                        <button
+                          className="btn-secondary"
+                          onClick={() => handleFinalizarAsignacion(a.id)}
+                        >
+                          Finalizar
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* ════ TAREAS ════ */}
       <div className="table-container">
         <div className="table-header">
           <h2>Tareas del proyecto</h2>
-
           {puedeGestionar && (
             <button
               className="btn-secondary"
-              onClick={() => setMostrarFormulario((prev) => !prev)}
+              onClick={() => (mostrarFormulario ? limpiarFormulario() : abrirFormulario())}
             >
               {mostrarFormulario ? "Ocultar formulario" : "+ Nueva tarea"}
             </button>
@@ -263,65 +493,45 @@ export default function DetalleProyectoPage() {
         {puedeGestionar && mostrarFormulario && (
           <form className="form-panel" onSubmit={handleCrearTarea}>
             <h3 className="form-title">Nueva tarea</h3>
-
             <div className="info-message">
-              La tarea nace como PENDIENTE con 0% de avance. Al cambiar su
-              estado, el backend recalcula automáticamente el avance de la tarea
-              y del proyecto.
+              La tarea nace como PENDIENTE con 0% de avance. Al cambiar su estado, el backend recalcula automáticamente el avance.
             </div>
 
             <div className="form-grid">
               <div className="form-group">
                 <label>Nombre de la tarea</label>
-                <input
-                  name="nombreTarea"
-                  value={form.nombreTarea}
-                  onChange={handleChange}
-                  required
-                />
+                <input name="nombreTarea" value={form.nombreTarea} onChange={handleChange} required />
               </div>
 
               <div className="form-group">
-                <label>ID Responsable</label>
-                <input
-                  name="idResponsable"
-                  type="number"
-                  min="1"
-                  value={form.idResponsable}
-                  onChange={handleChange}
-                  required
-                />
+                <label>Responsable</label>
+                {empleados.length === 0 ? (
+                  <p className="loading-inline">Cargando empleados...</p>
+                ) : (
+                  <select name="idResponsable" value={form.idResponsable} onChange={handleChange} required>
+                    <option value="">Selecciona un responsable</option>
+                    {empleados.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.nombre} {e.apellido} — {e.cargo}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="form-group">
                 <label>Fecha inicio</label>
-                <input
-                  name="fechaInicio"
-                  type="date"
-                  value={form.fechaInicio}
-                  onChange={handleChange}
-                  required
-                />
+                <input name="fechaInicio" type="date" value={form.fechaInicio} onChange={handleChange} required />
               </div>
 
               <div className="form-group">
                 <label>Fecha límite</label>
-                <input
-                  name="fechaLimite"
-                  type="date"
-                  value={form.fechaLimite}
-                  onChange={handleChange}
-                  required
-                />
+                <input name="fechaLimite" type="date" value={form.fechaLimite} onChange={handleChange} required />
               </div>
 
               <div className="form-group">
                 <label>Prioridad</label>
-                <select
-                  name="prioridad"
-                  value={form.prioridad}
-                  onChange={handleChange}
-                >
+                <select name="prioridad" value={form.prioridad} onChange={handleChange}>
                   <option value="BAJA">BAJA</option>
                   <option value="MEDIA">MEDIA</option>
                   <option value="ALTA">ALTA</option>
@@ -331,28 +541,14 @@ export default function DetalleProyectoPage() {
 
             <div className="form-group">
               <label>Descripción</label>
-              <textarea
-                name="descripcion"
-                value={form.descripcion}
-                onChange={handleChange}
-                rows={3}
-              />
+              <textarea name="descripcion" value={form.descripcion} onChange={handleChange} rows={3} />
             </div>
 
             <div className="form-actions">
-              <button
-                className="btn-primary btn-auto"
-                type="submit"
-                disabled={guardando}
-              >
+              <button className="btn-primary btn-auto" type="submit" disabled={guardando}>
                 {guardando ? "Guardando..." : "Guardar tarea"}
               </button>
-
-              <button
-                className="btn-secondary"
-                type="button"
-                onClick={limpiarFormulario}
-              >
+              <button className="btn-secondary" type="button" onClick={limpiarFormulario}>
                 Cancelar
               </button>
             </div>
@@ -374,72 +570,84 @@ export default function DetalleProyectoPage() {
                 <th>Prioridad</th>
                 <th>Avance</th>
                 <th>Responsable</th>
+                <th>Asignados</th>
                 <th>Fechas</th>
                 {puedeGestionar && <th>Cambiar estado</th>}
                 {puedeGestionar && <th>Acciones</th>}
               </tr>
             </thead>
-
             <tbody>
-              {tareas.map((tarea) => (
-                <tr key={tarea.id}>
-                  <td>{tarea.id}</td>
+              {tareas.map((tarea) => {
+                const asignTarea = asignacionesTarea[tarea.id] || [];
+                const activasTarea = asignTarea.filter((a) => a.estado === "ACTIVA");
+                const responsable = empleados.find((e) => e.id === tarea.idResponsable);
 
-                  <td>
-                    <strong>{tarea.nombreTarea}</strong>
-                    {tarea.descripcion && (
-                      <div className="row-hint">{tarea.descripcion}</div>
+                return (
+                  <tr key={tarea.id}>
+                    <td>{tarea.id}</td>
+                    <td>
+                      <strong>{tarea.nombreTarea}</strong>
+                      {tarea.descripcion && <div className="row-hint">{tarea.descripcion}</div>}
+                    </td>
+                    <td>
+                      <span className={getBadgeClass(tarea.estadoTarea)}>{tarea.estadoTarea}</span>
+                    </td>
+                    <td>
+                      <span className={getBadgeClass(tarea.prioridad)}>{tarea.prioridad}</span>
+                    </td>
+                    <td>{tarea.porcentajeAvance}%</td>
+                    <td>
+                      {responsable
+                        ? `${responsable.nombre} ${responsable.apellido}`
+                        : `#${tarea.idResponsable}`}
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {activasTarea.length === 0 ? (
+                          <span style={{ fontSize: 12, color: "var(--gris-oscuro)" }}>Sin asignar</span>
+                        ) : (
+                          activasTarea.map((a) => (
+                            <span key={a.id} style={{ fontSize: 12 }}>
+                              {a.empleado.nombre} {a.empleado.apellido} ({a.horasAsignadas}h)
+                            </span>
+                          ))
+                        )}
+                        {puedeGestionar && (
+                          <button
+                            className="btn-secondary"
+                            style={{ fontSize: 11, padding: "2px 8px", marginTop: 4 }}
+                            onClick={() => setModalTareaId(tarea.id)}
+                          >
+                            + Asignar
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="project-dates">
+                      {tarea.fechaInicio} <br /> a {tarea.fechaLimite}
+                    </td>
+                    {puedeGestionar && (
+                      <td>
+                        <select
+                          value={tarea.estadoTarea}
+                          onChange={(e) => handleCambiarEstado(tarea.id, e.target.value)}
+                        >
+                          {estadosTarea.map((estado) => (
+                            <option key={estado} value={estado}>{estado}</option>
+                          ))}
+                        </select>
+                      </td>
                     )}
-                  </td>
-
-                  <td>
-                    <span className={getBadgeClass(tarea.estadoTarea)}>
-                      {tarea.estadoTarea}
-                    </span>
-                  </td>
-
-                  <td>
-                    <span className={getBadgeClass(tarea.prioridad)}>
-                      {tarea.prioridad}
-                    </span>
-                  </td>
-
-                  <td>{tarea.porcentajeAvance}%</td>
-                  <td>{tarea.idResponsable}</td>
-
-                  <td className="project-dates">
-                    {tarea.fechaInicio} <br /> a {tarea.fechaLimite}
-                  </td>
-
-                  {puedeGestionar && (
-                    <td>
-                      <select
-                        value={tarea.estadoTarea}
-                        onChange={(event) =>
-                          handleCambiarEstado(tarea.id, event.target.value)
-                        }
-                      >
-                        {estadosTarea.map((estado) => (
-                          <option key={estado} value={estado}>
-                            {estado}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                  )}
-
-                  {puedeGestionar && (
-                    <td>
-                      <button
-                        className="btn-danger"
-                        onClick={() => handleEliminarTarea(tarea.id)}
-                      >
-                        Eliminar
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
+                    {puedeGestionar && (
+                      <td>
+                        <button className="btn-danger" onClick={() => handleEliminarTarea(tarea.id)}>
+                          Eliminar
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

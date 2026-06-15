@@ -12,7 +12,10 @@ import {
   eliminarProyecto,
   getProyectos,
 } from "../actions/get-proyectos";
+import { getClientes } from "../actions/get-clientes";
+import { getGestores, type UsuarioSimple } from "../actions/get-usuarios";
 import type { Proyecto } from "../interfaces/proyecto.interface";
+import type { ClienteSimple } from "../interfaces/cliente.interface";
 import { puedeGestionarProyectos } from "../utils/auth";
 
 type ProyectoForm = {
@@ -32,8 +35,8 @@ const initialForm: ProyectoForm = {
   fechaInicio: "",
   fechaFin: "",
   prioridad: "MEDIA",
-  idGestor: "1",
-  idCliente: "1",
+  idGestor: "",
+  idCliente: "",
 };
 
 export default function ProyectosPage() {
@@ -41,6 +44,8 @@ export default function ProyectosPage() {
   const puedeGestionar = puedeGestionarProyectos();
 
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  const [clientes, setClientes] = useState<ClienteSimple[]>([]);
+  const [gestores, setGestores] = useState<UsuarioSimple[]>([]);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -60,12 +65,35 @@ export default function ProyectosPage() {
     }
   }, []);
 
+  // Carga clientes y gestores una sola vez al montar
   useEffect(() => {
     cargarProyectos();
-  }, [cargarProyectos]);
+
+    if (puedeGestionar) {
+      getClientes()
+        .then(setClientes)
+        .catch(() => console.error("No se pudieron cargar los clientes"));
+
+      getGestores()
+        .then((data) => {
+          setGestores(data);
+          // Pre-selecciona el primero si el form está vacío
+          if (data.length > 0) {
+            setForm((prev) =>
+              prev.idGestor === "" ? { ...prev, idGestor: String(data[0].id) } : prev
+            );
+          }
+        })
+        .catch(() => console.error("No se pudieron cargar los gestores"));
+    }
+  }, [cargarProyectos, puedeGestionar]);
 
   const abrirFormularioCrear = () => {
-    setForm(initialForm);
+    setForm({
+      ...initialForm,
+      idCliente: clientes.length > 0 ? String(clientes[0].id) : "",
+      idGestor: gestores.length > 0 ? String(gestores[0].id) : "",
+    });
     setError("");
     setMostrarFormulario(true);
   };
@@ -79,9 +107,8 @@ export default function ProyectosPage() {
       fechaFin: proyecto.fechaFin,
       prioridad: proyecto.prioridad,
       idGestor: String(proyecto.idGestor),
-      idCliente: String(proyecto.cliente?.id || 1),
+      idCliente: String(proyecto.cliente?.id || ""),
     });
-
     setError("");
     setMostrarFormulario(true);
   };
@@ -96,11 +123,7 @@ export default function ProyectosPage() {
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = event.target;
-
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -108,6 +131,11 @@ export default function ProyectosPage() {
 
     if (!puedeGestionar) {
       setError("No tienes permisos para guardar proyectos.");
+      return;
+    }
+
+    if (!form.idCliente || !form.idGestor) {
+      setError("Debes seleccionar un cliente y un gestor.");
       return;
     }
 
@@ -138,9 +166,7 @@ export default function ProyectosPage() {
       await cargarProyectos();
     } catch (error) {
       console.error("Error guardando proyecto:", error);
-      setError(
-        "No se pudo guardar el proyecto. Revisa que el ID Cliente exista y que las fechas sean válidas."
-      );
+      setError("No se pudo guardar el proyecto. Revisa que las fechas sean válidas.");
     } finally {
       setGuardando(false);
     }
@@ -227,16 +253,27 @@ export default function ProyectosPage() {
                 />
               </div>
 
+              {/* SELECTOR DE CLIENTE */}
               <div className="form-group">
-                <label>ID Cliente</label>
-                <input
-                  name="idCliente"
-                  type="number"
-                  min="1"
-                  value={form.idCliente}
-                  onChange={handleChange}
-                  required
-                />
+                <label>Cliente</label>
+                {clientes.length === 0 ? (
+                  <p className="loading-inline">Cargando clientes...</p>
+                ) : (
+                  <select
+                    name="idCliente"
+                    value={form.idCliente}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">Selecciona un cliente</option>
+                    {clientes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombreCliente}
+                        {c.rubro ? ` — ${c.rubro}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="form-group">
@@ -274,16 +311,27 @@ export default function ProyectosPage() {
                 </select>
               </div>
 
+              {/* SELECTOR DE GESTOR */}
               <div className="form-group">
-                <label>ID Gestor</label>
-                <input
-                  name="idGestor"
-                  type="number"
-                  min="1"
-                  value={form.idGestor}
-                  onChange={handleChange}
-                  required
-                />
+                <label>Gestor responsable</label>
+                {gestores.length === 0 ? (
+                  <p className="loading-inline">Cargando gestores...</p>
+                ) : (
+                  <select
+                    name="idGestor"
+                    value={form.idGestor}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">Selecciona un gestor</option>
+                    {gestores.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.nombre} {g.apellido}
+                        {g.rol ? ` (${g.rol.nombreRol})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -377,7 +425,6 @@ export default function ProyectosPage() {
                         className="btn-secondary"
                         onClick={(event) => {
                           event.stopPropagation();
-
                           if (puedeGestionar) {
                             abrirFormularioEditar(p);
                           } else {
