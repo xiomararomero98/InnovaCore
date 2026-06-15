@@ -188,12 +188,21 @@ export default function DetalleProyectoPage() {
 
   return (
     <div className="page-container">
-      <button
-        className="btn-secondary btn-auto"
-        onClick={() => navigate("/proyectos")}
-      >
-        ← Volver a proyectos
-      </button>
+      <div className="form-actions">
+        <button
+          className="btn-secondary btn-auto"
+          onClick={() => navigate("/proyectos")}
+        >
+          ← Volver a proyectos
+        </button>
+
+        <button
+          className="btn-secondary btn-auto"
+          onClick={() => navigate("/dashboard")}
+        >
+          Volver al dashboard
+        </button>
+      </div>
 
       <h1 className="page-title">{proyecto.nombreProyecto}</h1>
       <p className="page-subtitle">

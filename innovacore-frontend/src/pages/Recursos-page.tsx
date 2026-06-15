@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getEmpleados } from "../actions/get-empleados";
 import type { Empleado } from "../interfaces/empleado.interface";
 
 export default function RecursosPage() {
+  const navigate = useNavigate();
+
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,8 +30,17 @@ export default function RecursosPage() {
 
   return (
     <div className="page-container">
+      <button
+        className="btn-secondary btn-auto"
+        onClick={() => navigate("/dashboard")}
+      >
+        ← Volver al dashboard
+      </button>
+
       <h1 className="page-title">Gestión de Recursos</h1>
-      <p className="page-subtitle">Empleados y profesionales de la organización</p>
+      <p className="page-subtitle">
+        Empleados y profesionales de la organización
+      </p>
 
       <div className="table-container">
         <div className="table-header">
@@ -53,13 +65,18 @@ export default function RecursosPage() {
                 <th>Disponibilidad</th>
               </tr>
             </thead>
+
             <tbody>
               {empleados.map((e) => (
                 <tr key={e.id}>
                   <td>{e.id}</td>
-                  <td><strong>{e.nombre} {e.apellido}</strong></td>
+                  <td>
+                    <strong>
+                      {e.nombre} {e.apellido}
+                    </strong>
+                  </td>
                   <td>{e.correo}</td>
-                  <td>{e.cargo || "-"}</td>
+                  <td>{e.cargo}</td>
                   <td>{e.especialidad || "-"}</td>
                   <td>
                     <span className={getBadgeClass(e.disponibilidad)}>

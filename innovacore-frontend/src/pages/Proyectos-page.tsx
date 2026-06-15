@@ -171,6 +171,13 @@ export default function ProyectosPage() {
 
   return (
     <div className="page-container">
+      <button
+        className="btn-secondary btn-auto"
+        onClick={() => navigate("/dashboard")}
+      >
+        ← Volver al dashboard
+      </button>
+
       <h1 className="page-title">Gestión de Proyectos</h1>
       <p className="page-subtitle">
         Administra los proyectos de la organización. El estado y el avance se
