@@ -180,6 +180,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [slideActual, setSlideActual] = useState(0);
+  const [mostrarOlvide, setMostrarOlvide] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -229,6 +230,22 @@ export default function LoginPage() {
             <button type="submit" className="btn-primary" disabled={loading}>
               {loading ? "Ingresando..." : "Iniciar sesión"}
             </button>
+            <button
+              type="button"
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--azul-medio, #2F80ED)",
+                cursor: "pointer",
+                fontSize: 13,
+                marginTop: 8,
+                padding: 0,
+                textDecoration: "underline",
+              }}
+              onClick={() => setMostrarOlvide(true)}
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
           </form>
           <div className="login-footer-note">
             <span>🔒</span>
@@ -255,6 +272,27 @@ export default function LoginPage() {
           <strong>InnovaCore</strong> · Sistema de gestión empresarial
         </div>
       </div>
+      {mostrarOlvide && (
+        <div className="modal-overlay" onClick={() => setMostrarOlvide(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <h3 className="form-title">¿Olvidaste tu contraseña?</h3>
+            <p style={{ marginBottom: 16, color: "var(--gris-oscuro)", lineHeight: 1.6 }}>
+              Por seguridad, la recuperación de contraseña es gestionada por el administrador del sistema.
+            </p>
+            <p style={{ marginBottom: 20, color: "var(--gris-oscuro)", lineHeight: 1.6 }}>
+              Contacta a tu administrador indicando tu correo <strong>{correo || "registrado"}</strong> y solicitará un reseteo de contraseña temporal.
+            </p>
+            <div className="form-actions">
+              <button
+                className="btn-primary btn-auto"
+                onClick={() => setMostrarOlvide(false)}
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

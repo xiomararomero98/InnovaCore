@@ -104,6 +104,25 @@ public class AsignacionService {
         }
     }
 
+    /**
+     * Valida que el empleado no supere las 40 horas semanales con la nueva asignación.
+     */
+    private void validarLimiteHoras(Long idEmpleado, Integer horasNuevas) {
+        List<Asignacion> activas = repository.findByEmpleadoIdAndEstado(idEmpleado, "ACTIVA");
+        int totalActual = activas.stream()
+                .map(Asignacion::getHorasAsignadas)
+                .filter(h -> h != null)
+                .mapToInt(Integer::intValue)
+                .sum();
+
+        if (totalActual + horasNuevas > LIMITE_HORAS_OCUPADO) {
+            throw new RuntimeException(
+                "El empleado ya tiene " + totalActual + "h asignadas. " +
+                "Agregar " + horasNuevas + "h supera el límite de " + LIMITE_HORAS_OCUPADO + "h semanales."
+            );
+        }
+    }
+
     private void validarAsignacionMultiple(AsignacionMultipleRequest request) {
         if (request.getEmpleadosIds() == null || request.getEmpleadosIds().isEmpty()) {
             throw new RuntimeException("Debe seleccionar al menos un empleado");
@@ -128,6 +147,9 @@ public class AsignacionService {
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));
 
         asignacion.setEmpleado(empleado);
+
+        // Validar límite de 40h antes de guardar
+        validarLimiteHoras(empleado.getId(), asignacion.getHorasAsignadas());
 
         if (asignacion.getFechaAsignacion() == null) {
             asignacion.setFechaAsignacion(LocalDateTime.now());
@@ -217,6 +239,9 @@ public class AsignacionService {
             throw new RuntimeException("El empleado " + empleado.getId()
                     + " ya tiene una asignación activa para este proyecto/tarea");
         }
+
+        // Validar límite de 40h antes de guardar
+        validarLimiteHoras(empleado.getId(), request.getHorasAsignadas());
 
         Asignacion asignacion = new Asignacion();
         asignacion.setEmpleado(empleado);

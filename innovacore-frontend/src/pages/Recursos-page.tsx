@@ -43,6 +43,7 @@ import {
 } from "../actions/get-usuarios";
 
 import type { Empleado } from "../interfaces/empleado.interface";
+import { tieneRol } from "../utils/auth";
 import type { ClienteSimple } from "../interfaces/cliente.interface";
 
 type EmpleadoForm = {
@@ -98,6 +99,8 @@ const rolesSistema: NombreRol[] = [
 
 export default function RecursosPage() {
   const navigate = useNavigate();
+
+  const esAdmin = tieneRol(["ADMINISTRADOR"]);
 
   const [tab, setTab] = useState<"empleados" | "clientes">("empleados");
 
@@ -582,40 +585,14 @@ export default function RecursosPage() {
     );
   }, [asignacionesEmpleado]);
 
+  // Suma todas las horas activas directamente (igual que el backend).
+  // El backend ya evita duplicados: si alguien tiene asignación de proyecto
+  // Y de tarea son asignaciones distintas con horas distintas.
   const horasActivas = useMemo(() => {
-    const horasPorProyecto = new Map<
-      number,
-      {
-        horasProyectoCompleto: number;
-        horasTareas: number;
-        tieneAsignacionGeneral: boolean;
-      }
-    >();
-
-    asignacionesActivas.forEach((a) => {
-      const actual = horasPorProyecto.get(a.idProyecto) || {
-        horasProyectoCompleto: 0,
-        horasTareas: 0,
-        tieneAsignacionGeneral: false,
-      };
-
-      if (a.idTarea === undefined || a.idTarea === null) {
-        actual.horasProyectoCompleto += a.horasAsignadas || 0;
-        actual.tieneAsignacionGeneral = true;
-      } else {
-        actual.horasTareas += a.horasAsignadas || 0;
-      }
-
-      horasPorProyecto.set(a.idProyecto, actual);
-    });
-
-    return Array.from(horasPorProyecto.values()).reduce((total, item) => {
-      if (item.tieneAsignacionGeneral) {
-        return total + item.horasProyectoCompleto;
-      }
-
-      return total + item.horasTareas;
-    }, 0);
+    return asignacionesActivas.reduce(
+      (total, a) => total + (a.horasAsignadas || 0),
+      0
+    );
   }, [asignacionesActivas]);
 
   const proyectosAsignados = useMemo(() => {
@@ -657,12 +634,14 @@ export default function RecursosPage() {
           👥 Empleados
         </button>
 
-        <button
-          className={`tab-btn ${tab === "clientes" ? "tab-active" : ""}`}
-          onClick={() => setTab("clientes")}
-        >
-          🏢 Clientes
-        </button>
+        {esAdmin && (
+          <button
+            className={`tab-btn ${tab === "clientes" ? "tab-active" : ""}`}
+            onClick={() => setTab("clientes")}
+          >
+            🏢 Clientes
+          </button>
+        )}
       </div>
 
       {tab === "empleados" && (
@@ -670,16 +649,18 @@ export default function RecursosPage() {
           <div className="table-container">
             <div className="table-header">
               <h2>Equipo de trabajo</h2>
-              <button className="btn-secondary" onClick={abrirCrearEmpleado}>
-                + Nuevo Empleado
-              </button>
+              {esAdmin && (
+                <button className="btn-secondary" onClick={abrirCrearEmpleado}>
+                  + Nuevo Empleado
+                </button>
+              )}
             </div>
 
             {errorEmpleado && (
               <div className="error-message">{errorEmpleado}</div>
             )}
 
-            {mostrarFormEmpleado && (
+            {mostrarFormEmpleado && esAdmin && (
               <form className="form-panel" onSubmit={handleSubmitEmpleado}>
                 <h3 className="form-title">
                   {formEmpleado.id ? "Editar empleado" : "Nuevo empleado"}
@@ -816,19 +797,23 @@ export default function RecursosPage() {
                             Ver perfil
                           </button>
 
-                          <button
-                            className="btn-secondary"
-                            onClick={() => abrirEditarEmpleado(e)}
-                          >
-                            Editar
-                          </button>
+                          {esAdmin && (
+                            <button
+                              className="btn-secondary"
+                              onClick={() => abrirEditarEmpleado(e)}
+                            >
+                              Editar
+                            </button>
+                          )}
 
-                          <button
-                            className="btn-danger"
-                            onClick={() => handleEliminarEmpleado(e.id)}
-                          >
-                            Eliminar
-                          </button>
+                          {esAdmin && (
+                            <button
+                              className="btn-danger"
+                              onClick={() => handleEliminarEmpleado(e.id)}
+                            >
+                              Eliminar
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -847,8 +832,9 @@ export default function RecursosPage() {
                     {empleadoSeleccionado.apellido}
                   </h2>
                   <p>
-                    Datos laborales, credenciales de sistema y asignaciones
-                    activas.
+                    {esAdmin
+                      ? "Datos laborales, credenciales de sistema y asignaciones activas."
+                      : "Datos laborales y asignaciones activas."}
                   </p>
                 </div>
 
@@ -914,6 +900,7 @@ export default function RecursosPage() {
                     </div>
                   </div>
 
+                  {esAdmin && (
                   <div className="form-panel">
                     <h3 className="form-title">Credenciales de sistema</h3>
 
@@ -1026,6 +1013,7 @@ export default function RecursosPage() {
                       </p>
                     )}
                   </div>
+                  )}
 
                   <div className="table-container">
                     <div className="table-header">

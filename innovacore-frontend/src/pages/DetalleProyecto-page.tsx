@@ -75,7 +75,8 @@ function AsignacionModal({
     .filter((a) => a.estado === "ACTIVA")
     .map((a) => a.empleado.id);
 
-  const toggleEmpleado = (id: number) => {
+  const toggleEmpleado = (id: number, bloqueado: boolean) => {
+    if (bloqueado) return;
     setSeleccionados((prev) =>
       prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id]
     );
@@ -138,17 +139,20 @@ function AsignacionModal({
         <div className="empleados-lista">
           {empleados.map((e) => {
             const yaAsignado = idsYaAsignados.includes(e.id);
+            const estaOcupado = e.disponibilidad === "OCUPADO" || e.disponibilidad === "NO_DISPONIBLE";
+            const bloqueado = yaAsignado || estaOcupado;
             const marcado = seleccionados.includes(e.id);
             return (
               <label
                 key={e.id}
-                className={`empleado-item ${yaAsignado ? "empleado-ya-asignado" : ""}`}
+                className={`empleado-item ${bloqueado ? "empleado-ya-asignado" : ""}`}
+                style={estaOcupado && !yaAsignado ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
               >
                 <input
                   type="checkbox"
                   checked={marcado}
-                  disabled={yaAsignado}
-                  onChange={() => toggleEmpleado(e.id)}
+                  disabled={bloqueado}
+                  onChange={() => toggleEmpleado(e.id, bloqueado)}
                 />
                 <span>
                   <strong>{e.nombre} {e.apellido}</strong>
@@ -160,6 +164,11 @@ function AsignacionModal({
                   {yaAsignado && (
                     <span style={{ color: "var(--gris-oscuro)", fontSize: 11, marginLeft: 6 }}>
                       (ya asignado)
+                    </span>
+                  )}
+                  {!yaAsignado && estaOcupado && (
+                    <span style={{ color: "var(--rojo, #e53e3e)", fontSize: 11, marginLeft: 6 }}>
+                      (sin disponibilidad — ≥40h)
                     </span>
                   )}
                 </span>

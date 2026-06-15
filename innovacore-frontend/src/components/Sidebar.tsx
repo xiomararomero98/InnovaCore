@@ -38,6 +38,11 @@ const menuItems: MenuItem[] = [
     path: "/analitica",
     roles: ["ADMINISTRADOR", "DIRECTIVO"],
   },
+  {
+    label: "Mi Perfil",
+    path: "/perfil",
+    roles: ["ADMINISTRADOR", "GESTOR_PROYECTOS", "COLABORADOR", "DIRECTIVO"],
+  },
 ];
 
 const getUsuario = () => {

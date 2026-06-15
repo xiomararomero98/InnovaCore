@@ -422,18 +422,26 @@ export default function ProyectosPage() {
                   <td>
                     <div className="table-actions">
                       <button
-                        className="btn-secondary"
+                        className="btn-primary"
                         onClick={(event) => {
                           event.stopPropagation();
-                          if (puedeGestionar) {
-                            abrirFormularioEditar(p);
-                          } else {
-                            navigate(`/proyectos/${p.id}`);
-                          }
+                          navigate(`/proyectos/${p.id}`);
                         }}
                       >
-                        {puedeGestionar ? "Editar" : "Ver detalle"}
+                        Ver detalle
                       </button>
+
+                      {puedeGestionar && (
+                        <button
+                          className="btn-secondary"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            abrirFormularioEditar(p);
+                          }}
+                        >
+                          Editar
+                        </button>
+                      )}
 
                       {puedeGestionar && (
                         <button

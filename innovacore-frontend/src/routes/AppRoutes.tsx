@@ -11,6 +11,7 @@ import DetalleProyectoPage from "../pages/DetalleProyecto-page";
 import NoAutorizadoPage from "../pages/NoAutorizado-page";
 import NotFoundPage from "../pages/NotFound-page";
 import MiPanelEmpleadoPage from "../pages/MiPanelEmpleado-page";
+import PerfilUsuarioPage from "../pages/PerfilUsuario-page";
 
 type RolUsuario =
   | "ADMINISTRADOR"
@@ -110,6 +111,10 @@ const router = createBrowserRouter([
             <MiPanelEmpleadoPage />
           </RoleRoute>
         ),
+      },
+      {
+        path: "perfil",
+        element: <PerfilUsuarioPage />,
       },
       {
         path: "proyectos",
