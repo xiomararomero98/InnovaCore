@@ -1,17 +1,20 @@
 package com.innovacore.ms_recursos.Controller;
 
+import com.innovacore.ms_recursos.DTO.AsignacionMultipleRequest;
 import com.innovacore.ms_recursos.Model.Asignacion;
+import com.innovacore.ms_recursos.Model.Empleado;
 import com.innovacore.ms_recursos.Service.AsignacionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
-@Tag(name = "Asignaciones", description = "Gestión de asignaciones de empleados a proyectos")
+@Tag(name = "Asignaciones", description = "Gestión de asignaciones de empleados a proyectos y tareas")
 @RestController
 @RequestMapping("/asignaciones")
 public class AsignacionController {
@@ -46,6 +49,20 @@ public class AsignacionController {
         return ResponseEntity.ok(service.getByProyecto(idProyecto));
     }
 
+    @Operation(summary = "Listar asignaciones por tarea")
+    @GetMapping("/tarea/{idTarea}")
+    public ResponseEntity<List<Asignacion>> getByTarea(@PathVariable Long idTarea) {
+        return ResponseEntity.ok(service.getByTarea(idTarea));
+    }
+
+    @Operation(summary = "Listar asignaciones por proyecto y tarea")
+    @GetMapping("/proyecto/{idProyecto}/tarea/{idTarea}")
+    public ResponseEntity<List<Asignacion>> getByProyectoYTarea(
+            @PathVariable Long idProyecto,
+            @PathVariable Long idTarea) {
+        return ResponseEntity.ok(service.getByProyectoYTarea(idProyecto, idTarea));
+    }
+
     @Operation(summary = "Crear asignación")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Asignación creada correctamente"),
@@ -54,6 +71,33 @@ public class AsignacionController {
     @PostMapping
     public ResponseEntity<Asignacion> create(@RequestBody Asignacion asignacion) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(asignacion));
+    }
+
+    @Operation(summary = "Asignar múltiples empleados a un proyecto")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Asignaciones creadas correctamente"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos")
+    })
+    @PostMapping("/proyecto/{idProyecto}/multiple")
+    public ResponseEntity<List<Asignacion>> asignarMultiplesEmpleadosAProyecto(
+            @PathVariable Long idProyecto,
+            @Valid @RequestBody AsignacionMultipleRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(service.asignarMultiplesEmpleadosAProyecto(idProyecto, request));
+    }
+
+    @Operation(summary = "Asignar múltiples empleados a una tarea de un proyecto")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Asignaciones creadas correctamente"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos")
+    })
+    @PostMapping("/proyecto/{idProyecto}/tarea/{idTarea}/multiple")
+    public ResponseEntity<List<Asignacion>> asignarMultiplesEmpleadosATarea(
+            @PathVariable Long idProyecto,
+            @PathVariable Long idTarea,
+            @Valid @RequestBody AsignacionMultipleRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(service.asignarMultiplesEmpleadosATarea(idProyecto, idTarea, request));
     }
 
     @Operation(summary = "Actualizar asignación")
@@ -74,4 +118,10 @@ public class AsignacionController {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
+
+    @Operation(summary = "Recalcular disponibilidad de un empleado según sus horas activas")
+@PatchMapping("/empleado/{idEmpleado}/recalcular-disponibilidad")
+public ResponseEntity<Empleado> recalcularDisponibilidadEmpleado(@PathVariable Long idEmpleado) {
+    return ResponseEntity.ok(service.recalcularDisponibilidadEmpleado(idEmpleado));
+}
 }

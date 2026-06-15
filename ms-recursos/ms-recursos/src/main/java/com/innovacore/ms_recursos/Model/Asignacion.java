@@ -25,6 +25,9 @@ public class Asignacion {
     @Column(name = "id_proyecto", nullable = false)
     private Long idProyecto; // referencia lógica a proyecto en db_proyectos
 
+    @Column(name = "id_tarea")
+    private Long idTarea; // referencia lógica opcional a tarea en db_proyectos
+
     @Column(name = "fecha_asignacion", nullable = false)
     private LocalDateTime fechaAsignacion;
 
