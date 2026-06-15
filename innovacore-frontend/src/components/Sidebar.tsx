@@ -19,6 +19,11 @@ const menuItems: MenuItem[] = [
     roles: ["ADMINISTRADOR", "GESTOR_PROYECTOS", "COLABORADOR", "DIRECTIVO"],
   },
   {
+    label: "Mi Panel",
+    path: "/mi-panel",
+    roles: ["COLABORADOR"],
+  },
+  {
     label: "Proyectos",
     path: "/proyectos",
     roles: ["ADMINISTRADOR", "GESTOR_PROYECTOS", "DIRECTIVO"],

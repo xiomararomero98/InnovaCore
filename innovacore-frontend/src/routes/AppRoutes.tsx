@@ -10,6 +10,7 @@ import AnaliticaPage from "../pages/Analitica-page";
 import DetalleProyectoPage from "../pages/DetalleProyecto-page";
 import NoAutorizadoPage from "../pages/NoAutorizado-page";
 import NotFoundPage from "../pages/NotFound-page";
+import MiPanelEmpleadoPage from "../pages/MiPanelEmpleado-page";
 
 type RolUsuario =
   | "ADMINISTRADOR"
@@ -101,6 +102,14 @@ const router = createBrowserRouter([
       {
         path: "dashboard",
         element: <DashboardPage />,
+      },
+      {
+        path: "mi-panel",
+        element: (
+          <RoleRoute allowedRoles={["COLABORADOR"]}>
+            <MiPanelEmpleadoPage />
+          </RoleRoute>
+        ),
       },
       {
         path: "proyectos",
