@@ -577,3 +577,31 @@ tr:hover {
     align-items: flex-start;
   }
 }
+
+/* ==========================================================
+   MEJORAS PROYECTOS Y TAREAS
+   ========================================================== */
+.info-message {
+  background: #eaf4ff;
+  border-left: 4px solid var(--azul-principal);
+  color: var(--azul-oscuro);
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.row-hint {
+  font-size: 12px;
+  color: var(--gris-oscuro);
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
+.small-kpi {
+  font-size: 18px;
+}

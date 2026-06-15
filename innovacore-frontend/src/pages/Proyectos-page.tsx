@@ -1,4 +1,11 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
+import { useNavigate } from "react-router-dom";
 import {
   actualizarProyecto,
   crearProyecto,
@@ -6,6 +13,7 @@ import {
   getProyectos,
 } from "../actions/get-proyectos";
 import type { Proyecto } from "../interfaces/proyecto.interface";
+import { puedeGestionarProyectos } from "../utils/auth";
 
 type ProyectoForm = {
   id?: number;
@@ -13,9 +21,7 @@ type ProyectoForm = {
   descripcion: string;
   fechaInicio: string;
   fechaFin: string;
-  estadoProyecto: string;
   prioridad: string;
-  porcentajeAvance: string;
   idGestor: string;
   idCliente: string;
 };
@@ -25,14 +31,15 @@ const initialForm: ProyectoForm = {
   descripcion: "",
   fechaInicio: "",
   fechaFin: "",
-  estadoProyecto: "PLANIFICADO",
   prioridad: "MEDIA",
-  porcentajeAvance: "0",
   idGestor: "1",
   idCliente: "1",
 };
 
 export default function ProyectosPage() {
+  const navigate = useNavigate();
+  const puedeGestionar = puedeGestionarProyectos();
+
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -40,11 +47,7 @@ export default function ProyectosPage() {
   const [form, setForm] = useState<ProyectoForm>(initialForm);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    cargarProyectos();
-  }, []);
-
-  const cargarProyectos = async () => {
+  const cargarProyectos = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getProyectos();
@@ -55,7 +58,11 @@ export default function ProyectosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    cargarProyectos();
+  }, [cargarProyectos]);
 
   const abrirFormularioCrear = () => {
     setForm(initialForm);
@@ -70,9 +77,7 @@ export default function ProyectosPage() {
       descripcion: proyecto.descripcion || "",
       fechaInicio: proyecto.fechaInicio,
       fechaFin: proyecto.fechaFin,
-      estadoProyecto: proyecto.estadoProyecto,
       prioridad: proyecto.prioridad,
-      porcentajeAvance: String(proyecto.porcentajeAvance),
       idGestor: String(proyecto.idGestor),
       idCliente: String(proyecto.cliente?.id || 1),
     });
@@ -91,6 +96,7 @@ export default function ProyectosPage() {
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = event.target;
+
     setForm((prev) => ({
       ...prev,
       [name]: value,
@@ -99,6 +105,11 @@ export default function ProyectosPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (!puedeGestionar) {
+      setError("No tienes permisos para guardar proyectos.");
+      return;
+    }
 
     try {
       setGuardando(true);
@@ -109,9 +120,7 @@ export default function ProyectosPage() {
         descripcion: form.descripcion,
         fechaInicio: form.fechaInicio,
         fechaFin: form.fechaFin,
-        estadoProyecto: form.estadoProyecto,
         prioridad: form.prioridad,
-        porcentajeAvance: Number(form.porcentajeAvance),
         idGestor: Number(form.idGestor),
         cliente: {
           id: Number(form.idCliente),
@@ -129,13 +138,20 @@ export default function ProyectosPage() {
       await cargarProyectos();
     } catch (error) {
       console.error("Error guardando proyecto:", error);
-      setError("No se pudo guardar el proyecto. Revisa que el ID Cliente exista.");
+      setError(
+        "No se pudo guardar el proyecto. Revisa que el ID Cliente exista y que las fechas sean válidas."
+      );
     } finally {
       setGuardando(false);
     }
   };
 
   const handleEliminar = async (id: number) => {
+    if (!puedeGestionar) {
+      setError("No tienes permisos para eliminar proyectos.");
+      return;
+    }
+
     const confirmar = window.confirm("¿Seguro que deseas eliminar este proyecto?");
     if (!confirmar) return;
 
@@ -157,8 +173,16 @@ export default function ProyectosPage() {
     <div className="page-container">
       <h1 className="page-title">Gestión de Proyectos</h1>
       <p className="page-subtitle">
-        Administra todos los proyectos de la organización
+        Administra los proyectos de la organización. El estado y el avance se
+        calculan automáticamente según las tareas asociadas.
       </p>
+
+      {!puedeGestionar && (
+        <div className="info-message">
+          Estás en modo solo lectura. Puedes revisar el avance, estado y tareas
+          del proyecto, pero no crear, editar ni eliminar registros.
+        </div>
+      )}
 
       {error && <div className="error-message">{error}</div>}
 
@@ -166,16 +190,24 @@ export default function ProyectosPage() {
         <div className="table-header">
           <h2>Listado de Proyectos</h2>
 
-          <button className="btn-secondary" onClick={abrirFormularioCrear}>
-            + Nuevo Proyecto
-          </button>
+          {puedeGestionar && (
+            <button className="btn-secondary" onClick={abrirFormularioCrear}>
+              + Nuevo Proyecto
+            </button>
+          )}
         </div>
 
-        {mostrarFormulario && (
+        {puedeGestionar && mostrarFormulario && (
           <form className="form-panel" onSubmit={handleSubmit}>
             <h3 className="form-title">
               {form.id ? "Editar proyecto" : "Nuevo proyecto"}
             </h3>
+
+            <div className="info-message">
+              El avance y el estado del proyecto no se ingresan manualmente. El
+              sistema los recalcula automáticamente según el estado real de sus
+              tareas.
+            </div>
 
             <div className="form-grid">
               <div className="form-group">
@@ -223,20 +255,6 @@ export default function ProyectosPage() {
               </div>
 
               <div className="form-group">
-                <label>Estado</label>
-                <select
-                  name="estadoProyecto"
-                  value={form.estadoProyecto}
-                  onChange={handleChange}
-                >
-                  <option value="PLANIFICADO">PLANIFICADO</option>
-                  <option value="EN_CURSO">EN_CURSO</option>
-                  <option value="FINALIZADO">FINALIZADO</option>
-                  <option value="ATRASADO">ATRASADO</option>
-                </select>
-              </div>
-
-              <div className="form-group">
                 <label>Prioridad</label>
                 <select
                   name="prioridad"
@@ -247,19 +265,6 @@ export default function ProyectosPage() {
                   <option value="MEDIA">MEDIA</option>
                   <option value="ALTA">ALTA</option>
                 </select>
-              </div>
-
-              <div className="form-group">
-                <label>Avance</label>
-                <input
-                  name="porcentajeAvance"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={form.porcentajeAvance}
-                  onChange={handleChange}
-                  required
-                />
               </div>
 
               <div className="form-group">
@@ -318,9 +323,9 @@ export default function ProyectosPage() {
                 <th>ID</th>
                 <th>Nombre</th>
                 <th>Cliente</th>
-                <th>Estado</th>
+                <th>Estado automático</th>
                 <th>Prioridad</th>
-                <th>Avance</th>
+                <th>Avance automático</th>
                 <th>Fechas</th>
                 <th>Acciones</th>
               </tr>
@@ -328,7 +333,11 @@ export default function ProyectosPage() {
 
             <tbody>
               {proyectos.map((p) => (
-                <tr key={p.id}>
+                <tr
+                  key={p.id}
+                  className="clickable-row"
+                  onClick={() => navigate(`/proyectos/${p.id}`)}
+                >
                   <td>{p.id}</td>
 
                   <td>
@@ -359,17 +368,30 @@ export default function ProyectosPage() {
                     <div className="table-actions">
                       <button
                         className="btn-secondary"
-                        onClick={() => abrirFormularioEditar(p)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+
+                          if (puedeGestionar) {
+                            abrirFormularioEditar(p);
+                          } else {
+                            navigate(`/proyectos/${p.id}`);
+                          }
+                        }}
                       >
-                        Editar
+                        {puedeGestionar ? "Editar" : "Ver detalle"}
                       </button>
 
-                      <button
-                        className="btn-danger"
-                        onClick={() => handleEliminar(p.id)}
-                      >
-                        Eliminar
-                      </button>
+                      {puedeGestionar && (
+                        <button
+                          className="btn-danger"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleEliminar(p.id);
+                          }}
+                        >
+                          Eliminar
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
