@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -36,6 +37,10 @@ public class Usuario {
 
     @Column(nullable = false, columnDefinition = "INTEGER DEFAULT 1")
     private Integer estado;
+
+    // Vincula este usuario de seguridad con un empleado del microservicio ms-recursos
+    @Column(name = "id_empleado")
+    private Long idEmpleado;
 
     @Column(name = "fecha_creacion")
     private LocalDateTime fechaCreacion = LocalDateTime.now();

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 import java.util.Map;
 
@@ -47,6 +48,24 @@ public class UsuarioController {
     }
 
     // ================================
+    // BUSCAR POR CORREO
+    // ================================
+    @Operation(summary = "Obtener usuario por correo")
+    @GetMapping("/correo")
+    public ResponseEntity<Usuario> getByCorreo(@RequestParam String correo) {
+        return ResponseEntity.ok(service.getByCorreo(correo));
+    }
+
+    // ================================
+    // BUSCAR POR EMPLEADO
+    // ================================
+    @Operation(summary = "Obtener usuario asociado a un empleado")
+    @GetMapping("/empleado/{idEmpleado}")
+    public ResponseEntity<Usuario> getByEmpleado(@PathVariable Long idEmpleado) {
+        return ResponseEntity.ok(service.getByEmpleado(idEmpleado));
+    }
+
+    // ================================
     // CREAR USUARIO
     // ================================
     @Operation(summary = "Crear usuario", description = "Registra un nuevo usuario en el sistema.")
@@ -71,33 +90,6 @@ public class UsuarioController {
     @PutMapping("/{id}")
     public ResponseEntity<Usuario> update(@PathVariable Long id, @RequestBody Usuario usuario) {
         return ResponseEntity.ok(service.update(id, usuario));
-    }
-
-    // ================================
-    // DESACTIVAR USUARIO
-    // ================================
-    @Operation(summary = "Desactivar usuario", description = "Desactiva un usuario (estado = 0).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Usuario desactivado correctamente"),
-            @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
-    })
-    @PutMapping("/{id}/desactivar")
-    public ResponseEntity<Usuario> desactivar(@PathVariable Long id) {
-        return ResponseEntity.ok(service.desactivar(id));
-    }
-
-    // ================================
-    // ELIMINAR USUARIO
-    // ================================
-    @Operation(summary = "Eliminar usuario")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Usuario eliminado correctamente"),
-            @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
-    })
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        service.delete(id);
-        return ResponseEntity.noContent().build();
     }
 
     // ================================
@@ -131,5 +123,54 @@ public class UsuarioController {
             @PathVariable Long idUsuario,
             @PathVariable Long idRol) {
         return ResponseEntity.ok(service.cambiarRol(idUsuario, idRol));
+    }
+
+    // ================================
+    // RESETEAR CONTRASEÑA
+    // ================================
+    @Operation(summary = "Resetear contraseña temporal")
+    @PatchMapping("/{idUsuario}/reset-password")
+    public ResponseEntity<Usuario> resetearContrasena(
+            @PathVariable Long idUsuario,
+            @RequestBody Map<String, String> body) {
+
+        String nuevaContrasena = body.get("nuevaContrasena");
+        return ResponseEntity.ok(service.resetearContrasena(idUsuario, nuevaContrasena));
+    }
+
+    // ================================
+    // DESACTIVAR USUARIO
+    // ================================
+    @Operation(summary = "Desactivar usuario", description = "Desactiva un usuario (estado = 0).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuario desactivado correctamente"),
+            @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
+    })
+    @PutMapping("/{id}/desactivar")
+    public ResponseEntity<Usuario> desactivar(@PathVariable Long id) {
+        return ResponseEntity.ok(service.desactivar(id));
+    }
+
+    // ================================
+    // ACTIVAR USUARIO
+    // ================================
+    @Operation(summary = "Activar usuario", description = "Activa un usuario (estado = 1).")
+    @PutMapping("/{id}/activar")
+    public ResponseEntity<Usuario> activar(@PathVariable Long id) {
+        return ResponseEntity.ok(service.activar(id));
+    }
+
+    // ================================
+    // ELIMINAR USUARIO
+    // ================================
+    @Operation(summary = "Eliminar usuario")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Usuario eliminado correctamente"),
+            @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        service.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }
