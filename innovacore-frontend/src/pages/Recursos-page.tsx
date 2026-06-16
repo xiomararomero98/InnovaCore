@@ -143,7 +143,8 @@ export default function RecursosPage() {
   const cargarEmpleados = useCallback(async () => {
     try {
       setLoadingEmpleados(true);
-      setEmpleados(await getEmpleados());
+      const todos = await getEmpleados();
+      setEmpleados(todos.filter((e) => e.estado !== 0));
     } catch {
       setErrorEmpleado("No se pudieron cargar los empleados.");
     } finally {

@@ -6,5 +6,5 @@ export interface Empleado {
   cargo?: string;
   especialidad?: string;
   disponibilidad: string;
-  estado?: string;
+  estado?: number;
 }
