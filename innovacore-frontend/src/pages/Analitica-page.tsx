@@ -1,5 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { useNavigate } from "react-router-dom";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+
 import { getKpis, getDashboard } from "../actions/get-kpis";
 import type { Kpi, Dashboard } from "../interfaces/kpi.interface";
 import KpiCard from "../components/KpiCard";
@@ -78,10 +88,12 @@ function GrupoGrafico({
 
 export default function AnaliticaPage() {
   const navigate = useNavigate();
+  const reporteRef = useRef<HTMLDivElement>(null);
 
   const [kpis, setKpis] = useState<Kpi[]>([]);
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
 
   const cargarDatos = useCallback(async () => {
     try {
@@ -104,6 +116,51 @@ export default function AnaliticaPage() {
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);
+
+  const handleDescargarPDF = async () => {
+    if (!reporteRef.current) return;
+
+    try {
+      setGenerandoPdf(true);
+
+      const canvas = await html2canvas(reporteRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const margin = 10;
+      const imgWidth = pageWidth - margin * 2;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let yPosition = margin;
+      let remainingHeight = imgHeight;
+
+      pdf.addImage(imgData, "PNG", margin, yPosition, imgWidth, imgHeight);
+      remainingHeight -= pageHeight - margin * 2;
+
+      while (remainingHeight > 0) {
+        pdf.addPage();
+        yPosition = margin - (imgHeight - remainingHeight);
+        pdf.addImage(imgData, "PNG", margin, yPosition, imgWidth, imgHeight);
+        remainingHeight -= pageHeight - margin * 2;
+      }
+
+      const fecha = new Date().toISOString().slice(0, 10);
+      pdf.save(`reporte-analitica-${fecha}.pdf`);
+    } catch (error) {
+      console.error("Error generando PDF:", error);
+      alert("No se pudo generar el PDF. Intenta nuevamente.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
 
   const getTipoCard = (kpi: Kpi): TipoCard => {
     if (kpi.nombre.toLowerCase().includes("atrasado")) return "alerta";
@@ -239,35 +296,54 @@ export default function AnaliticaPage() {
 
   return (
     <div className="page-container">
-      <button
-        className="btn-secondary btn-auto"
-        onClick={() => navigate("/dashboard")}
-      >
-        ← Volver al dashboard
-      </button>
+      <div className="report-actions">
+        <button
+          className="btn-secondary btn-auto"
+          onClick={() => navigate("/dashboard")}
+        >
+          ← Volver al dashboard
+        </button>
 
-      <div className="analytics-hero">
-        <div>
-          <p className="analytics-eyebrow">Panel ejecutivo</p>
-          <h1 className="page-title">Analítica</h1>
-          <p className="page-subtitle">
-            Indicadores clave de desempeño en tiempo real para apoyar la toma de
-            decisiones.
-          </p>
-        </div>
-
-        {datosAnaliticos && (
-          <div className="analytics-hero-metric">
-            <span>Avance promedio</span>
-            <strong>{datosAnaliticos.avancePromedio.toFixed(1)}%</strong>
-          </div>
-        )}
+        <button
+          className="btn-primary btn-auto"
+          onClick={handleDescargarPDF}
+          disabled={generandoPdf || loading}
+        >
+          {generandoPdf ? "Generando PDF..." : "Descargar reporte PDF"}
+        </button>
       </div>
 
       {loading ? (
         <div className="loading">Cargando analítica...</div>
       ) : (
-        <>
+        <div ref={reporteRef} className="analytics-report-area">
+          <div className="analytics-hero">
+            <div>
+              <p className="analytics-eyebrow">Panel ejecutivo</p>
+              <h1 className="page-title">Reporte de analítica</h1>
+              <p className="page-subtitle">
+                Indicadores clave de desempeño en tiempo real para apoyar la
+                toma de decisiones.
+              </p>
+            </div>
+
+            {datosAnaliticos && (
+              <div className="analytics-hero-metric">
+                <span>Avance promedio</span>
+                <strong>{datosAnaliticos.avancePromedio.toFixed(1)}%</strong>
+              </div>
+            )}
+          </div>
+
+          <div className="report-meta">
+            <strong>Reporte generado:</strong>{" "}
+            {new Date().toLocaleDateString("es-CL")}{" "}
+            {new Date().toLocaleTimeString("es-CL", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
+
           <div className="kpi-grid">
             {kpis.map((kpi, index) => (
               <KpiCard
@@ -300,7 +376,7 @@ export default function AnaliticaPage() {
                       style={
                         {
                           "--progress": `${datosAnaliticos.avancePromedio}%`,
-                        } as React.CSSProperties
+                        } as CSSProperties
                       }
                     >
                       <span>{datosAnaliticos.avancePromedio.toFixed(1)}%</span>
@@ -337,7 +413,7 @@ export default function AnaliticaPage() {
                       style={
                         {
                           "--progress": `${datosAnaliticos.utilizacionRecursos}%`,
-                        } as React.CSSProperties
+                        } as CSSProperties
                       }
                     >
                       <span>
@@ -458,7 +534,7 @@ export default function AnaliticaPage() {
               </div>
             </>
           )}
-        </>
+        </div>
       )}
     </div>
   );
