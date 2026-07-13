@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  # ── Backend: compilar, testear y empaquetar cada microservicio ──
+  # ── Backend: compilar, testear y generar cobertura JaCoCo ──
   backend:
     name: Backend - ${{ matrix.service.name }}
     runs-on: ubuntu-latest
@@ -36,16 +36,24 @@ jobs:
         working-directory: ${{ matrix.service.path }}
         run: mvn clean compile -DskipTests
 
-      - name: Ejecutar tests de ${{ matrix.service.name }}
+      - name: Ejecutar tests y generar cobertura JaCoCo
         working-directory: ${{ matrix.service.path }}
-        run: mvn test
+        run: mvn test jacoco:report
         continue-on-error: true
+
+      - name: Subir reporte JaCoCo
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-report-${{ matrix.service.name }}
+          path: ${{ matrix.service.path }}/target/site/jacoco/
+          if-no-files-found: ignore
 
       - name: Empaquetar ${{ matrix.service.name }}
         working-directory: ${{ matrix.service.path }}
         run: mvn package -DskipTests
 
-  # ── Frontend: instalar, testear y build ──
+  # ── Frontend: instalar, testear con cobertura y build ──
   frontend:
     name: Frontend - InnovaCore
     runs-on: ubuntu-latest
@@ -62,9 +70,17 @@ jobs:
         working-directory: innovacore-frontend
         run: npm install
 
-      - name: Ejecutar tests frontend
+      - name: Ejecutar tests con cobertura
         working-directory: innovacore-frontend
-        run: npm run test -- --run
+        run: npm run test:coverage
+
+      - name: Subir reporte cobertura frontend
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-frontend
+          path: innovacore-frontend/coverage/
+          if-no-files-found: ignore
 
       - name: Build frontend
         working-directory: innovacore-frontend
@@ -81,5 +97,6 @@ jobs:
         run: |
           echo "## InnovaCore CI/CD - Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Backend: 6 microservicios compilados y empaquetados" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Frontend: tests ejecutados y build generado" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Backend: 6 microservicios compilados, testeados y empaquetados" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Frontend: tests con cobertura ejecutados y build generado" >> $GITHUB_STEP_SUMMARY
+          echo "📊 Reportes JaCoCo disponibles en los artifacts de cada microservicio" >> $GITHUB_STEP_SUMMARY

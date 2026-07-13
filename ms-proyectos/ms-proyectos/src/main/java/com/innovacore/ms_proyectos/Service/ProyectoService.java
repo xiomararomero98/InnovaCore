@@ -145,8 +145,13 @@ public class ProyectoService {
         proyecto.setPorcentajeAvance(avance);
 
         // 2. Calcular estado automáticamente
-        String estado = calcularEstado(proyecto, tareas);
-        proyecto.setEstadoProyecto(estado);
+        String nuevoEstado = calcularEstado(proyecto, tareas);
+        // Guardar estado anterior y fecha de cambio si el estado cambió
+        if (!nuevoEstado.equals(proyecto.getEstadoProyecto())) {
+            proyecto.setEstadoAnterior(proyecto.getEstadoProyecto());
+            proyecto.setFechaCambioEstado(java.time.LocalDateTime.now());
+        }
+        proyecto.setEstadoProyecto(nuevoEstado);
 
         return repository.save(proyecto);
     }

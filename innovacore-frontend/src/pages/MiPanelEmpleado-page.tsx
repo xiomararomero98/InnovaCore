@@ -15,6 +15,7 @@ import {
 
 import type { Proyecto } from "../interfaces/proyecto.interface";
 import type { Tarea } from "../interfaces/tarea.interface";
+import ComentariosTarea from "../components/ComentariosTarea";
 
 type EstadoTarea = "PENDIENTE" | "EN_PROGRESO" | "COMPLETADA";
 
@@ -472,6 +473,24 @@ export default function MiPanelEmpleadoPage() {
           </table>
         )}
       </div>
+
+      {/* COMENTARIOS POR TAREA */}
+      {tareasAsignadas.length > 0 && (
+        <div>
+          {tareasAsignadas.map(({ tarea, asignacion }) => {
+            const idTarea = tarea.id || asignacion.idTarea;
+            if (!idTarea) return null;
+            return (
+              <ComentariosTarea
+                key={idTarea}
+                idTarea={idTarea}
+                nombreTarea={tarea.nombreTarea || `Tarea #${idTarea}`}
+                esPropietario={true}
+              />
+            );
+          })}
+        </div>
+      )}
 
       <div className="table-container">
         <div className="table-header">

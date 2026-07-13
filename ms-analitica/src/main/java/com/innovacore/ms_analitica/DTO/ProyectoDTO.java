@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
@@ -16,4 +17,6 @@ public class ProyectoDTO {
     private Integer porcentajeAvance;
     private LocalDate fechaInicio;
     private LocalDate fechaFin;
+    private LocalDateTime fechaCambioEstado;
+    private String estadoAnterior;
 }

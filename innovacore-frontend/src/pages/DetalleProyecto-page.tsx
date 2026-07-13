@@ -26,6 +26,7 @@ import type { Proyecto } from "../interfaces/proyecto.interface";
 import type { Tarea } from "../interfaces/tarea.interface";
 import type { Empleado } from "../interfaces/empleado.interface";
 import { puedeGestionarProyectos } from "../utils/auth";
+import ComentariosTarea from "../components/ComentariosTarea";
 
 type TareaForm = {
   nombreTarea: string;
@@ -70,6 +71,7 @@ function AsignacionModal({
   const [rol, setRol] = useState("DESARROLLADOR");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  const [mensajeExito, setMensajeExito] = useState("");
 
   const idsYaAsignados = asignacionesActivas
     .filter((a) => a.estado === "ACTIVA")
@@ -109,6 +111,7 @@ function AsignacionModal({
         <h3 className="form-title">{titulo}</h3>
 
         {error && <div className="error-message">{error}</div>}
+      {mensajeExito && <div className="success-message">{mensajeExito}</div>}
 
         <div className="form-grid" style={{ marginBottom: 16 }}>
           <div className="form-group">
@@ -218,6 +221,7 @@ export default function DetalleProyectoPage() {
   // Modal de asignación
   const [modalProyecto, setModalProyecto] = useState(false);
   const [modalTareaId, setModalTareaId] = useState<number | null>(null);
+  const [mensajeExito, setMensajeExito] = useState("");
 
   const cargarDetalle = useCallback(async () => {
     try {
@@ -331,8 +335,11 @@ export default function DetalleProyectoPage() {
   };
 
   const handleFinalizarAsignacion = async (idAsignacion: number) => {
+    if (!window.confirm("¿Confirmas que deseas retirar a este empleado del proyecto?")) return;
     try {
       await finalizarAsignacion(idAsignacion);
+      setMensajeExito("Empleado retirado del proyecto correctamente.");
+      setTimeout(() => setMensajeExito(""), 3000);
       await cargarDetalle();
     } catch {
       setError("No se pudo finalizar la asignación.");
@@ -370,7 +377,9 @@ export default function DetalleProyectoPage() {
       {modalTareaId !== null && (
         <AsignacionModal
           titulo={`Asignar empleados a tarea: ${tareas.find((t) => t.id === modalTareaId)?.nombreTarea}`}
-          empleados={empleados}
+          empleados={empleados.filter((e) =>
+            asignacionesProyecto.some((a) => a.empleado?.id === e.id && a.estado === "ACTIVA")
+          )}
           asignacionesActivas={asignacionesTarea[modalTareaId] || []}
           onGuardar={(ids, horas, rol) =>
             asignarEmpleadosATarea(idProyecto, modalTareaId, { empleadosIds: ids, horasAsignadas: horas, rolEnProyecto: rol })
@@ -439,7 +448,7 @@ export default function DetalleProyectoPage() {
           )}
         </div>
 
-        {asignacionesProyecto.length === 0 ? (
+        {asignacionesProyecto.filter((a) => a.estado === "ACTIVA").length === 0 ? (
           <div className="empty-state">
             <h3>No hay empleados asignados a este proyecto</h3>
           </div>
@@ -455,7 +464,7 @@ export default function DetalleProyectoPage() {
               </tr>
             </thead>
             <tbody>
-              {asignacionesProyecto.map((a) => (
+              {asignacionesProyecto.filter((a) => a.estado === "ACTIVA").map((a) => (
                 <tr key={a.id}>
                   <td>
                     <strong>{a.empleado.nombre} {a.empleado.apellido}</strong>
@@ -581,6 +590,7 @@ export default function DetalleProyectoPage() {
                 <th>Responsable</th>
                 <th>Asignados</th>
                 <th>Fechas</th>
+                <th>Último cambio de estado</th>
                 {puedeGestionar && <th>Cambiar estado</th>}
                 {puedeGestionar && <th>Acciones</th>}
               </tr>
@@ -635,6 +645,31 @@ export default function DetalleProyectoPage() {
                     <td className="project-dates">
                       {tarea.fechaInicio} <br /> a {tarea.fechaLimite}
                     </td>
+                    <td>
+                      {tarea.fechaCambioEstado ? (
+                        <div style={{ fontSize: 12 }}>
+                          <div style={{ color: "var(--text-muted)", marginBottom: 2 }}>
+                            {new Date(tarea.fechaCambioEstado).toLocaleDateString("es-CL")}
+                          </div>
+                          <div style={{ color: "var(--text-muted)" }}>
+                            {new Date(tarea.fechaCambioEstado).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}
+                          </div>
+                          {tarea.estadoAnterior && (
+                            <div style={{ marginTop: 4 }}>
+                              <span className={`badge badge-${tarea.estadoAnterior.toLowerCase().replace(/_/g, "-")}`} style={{ fontSize: 10 }}>
+                                {tarea.estadoAnterior}
+                              </span>
+                              <span style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 4px" }}>→</span>
+                              <span className={`badge badge-${tarea.estadoTarea.toLowerCase().replace(/_/g, "-")}`} style={{ fontSize: 10 }}>
+                                {tarea.estadoTarea}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Sin cambios aún</span>
+                      )}
+                    </td>
                     {puedeGestionar && (
                       <td>
                         <select
@@ -661,6 +696,30 @@ export default function DetalleProyectoPage() {
           </table>
         )}
       </div>
+
+      {/* ── COMENTARIOS POR TAREA ── */}
+      {tareas.length > 0 && (
+        <div>
+          {tareas.map((tarea) => {
+            const asignTarea = asignacionesTarea[tarea.id] || [];
+            const idsAsignados = asignTarea
+              .filter((a) => a.estado === "ACTIVA")
+              .map((a) => a.empleado.id);
+            const idsProyecto = asignacionesProyecto
+              .filter((a) => a.estado === "ACTIVA")
+              .map((a) => a.empleado.id);
+            return (
+              <ComentariosTarea
+                key={tarea.id}
+                idTarea={tarea.id}
+                nombreTarea={tarea.nombreTarea}
+                idsEmpleadosAsignados={idsAsignados}
+                idsEmpleadosProyecto={idsProyecto}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

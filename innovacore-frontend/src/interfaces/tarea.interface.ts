@@ -13,6 +13,8 @@ export interface Tarea {
   prioridad: string;
   porcentajeAvance: number;
   fechaCreacion?: string;
+  fechaCambioEstado?: string;
+  estadoAnterior?: string;
   idResponsable: number;
   proyecto?: ProyectoResumen;
 }

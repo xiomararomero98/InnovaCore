@@ -135,6 +135,9 @@ public class TareaService {
     // ==========================================================
     public Tarea cambiarEstado(Long id, String nuevoEstado) {
         Tarea tarea = getById(id);
+        // Guardar estado anterior y fecha de cambio para KPIs de rendimiento
+        tarea.setEstadoAnterior(tarea.getEstadoTarea());
+        tarea.setFechaCambioEstado(LocalDateTime.now());
         tarea.setEstadoTarea(nuevoEstado);
         tarea.setPorcentajeAvance(calcularAvancePorEstado(nuevoEstado));
         Tarea actualizada = repository.save(tarea);

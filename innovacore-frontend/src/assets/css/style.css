@@ -1740,3 +1740,151 @@ tr:hover td {
   color: #334155;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
 }
+/* ==========================================================
+   COMENTARIOS DE TAREAS
+   ========================================================== */
+.comentarios-tarea {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-top: 16px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+}
+
+.comentarios-titulo {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--surface-2);
+}
+
+.comentarios-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  padding-right: 4px;
+}
+
+.comentario-item {
+  background: var(--surface-0);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+}
+
+.comentario-item.comentario-propio {
+  background: var(--info-bg);
+  border-color: rgba(27, 92, 200, 0.2);
+}
+
+.comentario-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.comentario-avatar {
+  width: 32px;
+  height: 32px;
+  background: var(--sapphire);
+  color: var(--white);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.comentario-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.comentario-meta strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.comentario-meta span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.comentario-eliminar {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: all var(--t);
+}
+
+.comentario-eliminar:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.comentario-contenido {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.comentario-vacio {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 24px;
+  font-style: italic;
+}
+
+.comentario-nuevo {
+  border-top: 1px solid var(--surface-2);
+  padding-top: 16px;
+}
+
+.comentario-input {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  background: var(--white);
+  resize: vertical;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+
+.comentario-input:focus {
+  outline: none;
+  border-color: var(--sapphire);
+  box-shadow: 0 0 0 3px rgba(27, 92, 200, 0.12);
+}
+
+.comentario-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.comentario-chars {
+  font-size: 11px;
+  color: var(--text-muted);
+}

@@ -45,6 +45,12 @@ public class Tarea {
     @Column(name = "fecha_creacion")
     private LocalDateTime fechaCreacion;
 
+    @Column(name = "fecha_cambio_estado")
+    private LocalDateTime fechaCambioEstado;
+
+    @Column(name = "estado_anterior")
+    private String estadoAnterior;
+
     @Column(name = "id_responsable", nullable = false)
     private Long idResponsable; // referencia logica a usuario en db_seguridad
 

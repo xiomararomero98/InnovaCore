@@ -10,6 +10,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -217,6 +218,51 @@ public class KpiService {
     }
 
     // ==========================================================
+    // KPI: TAREAS COMPLETADAS EN LOS ÚLTIMOS 7 DÍAS
+    // ==========================================================
+    public KpiDTO getTareasCompletadasUltimaSemana() {
+        List<TareaDTO> tareas = obtenerTareas();
+        LocalDateTime haceUnaSemana = LocalDateTime.now().minusDays(7);
+        long completadasRecientes = tareas.stream()
+                .filter(t -> "COMPLETADA".equalsIgnoreCase(t.getEstadoTarea())
+                        && t.getFechaCambioEstado() != null
+                        && t.getFechaCambioEstado().isAfter(haceUnaSemana))
+                .count();
+        return new KpiDTO("Completadas esta semana", "Tareas completadas en los últimos 7 días",
+                (double) completadasRecientes, "cantidad", "RENDIMIENTO");
+    }
+
+    // ==========================================================
+    // KPI: PROYECTOS CON CAMBIO DE ESTADO ESTA SEMANA
+    // ==========================================================
+    public KpiDTO getProyectosCambiadosEstaSemana() {
+        List<ProyectoDTO> proyectos = obtenerProyectos();
+        LocalDateTime haceUnaSemana = LocalDateTime.now().minusDays(7);
+        long cambiadosRecientes = proyectos.stream()
+                .filter(p -> p.getFechaCambioEstado() != null
+                        && p.getFechaCambioEstado().isAfter(haceUnaSemana))
+                .count();
+        return new KpiDTO("Proyectos actualizados", "Proyectos con cambio de estado en los últimos 7 días",
+                (double) cambiadosRecientes, "cantidad", "RENDIMIENTO");
+    }
+
+    // ==========================================================
+    // KPI: TASA DE COMPLETITUD DE TAREAS
+    // ==========================================================
+    public KpiDTO getTasaCompletitudTareas() {
+        List<TareaDTO> tareas = obtenerTareas();
+        if (tareas.isEmpty()) {
+            return new KpiDTO("Tasa de completitud", "Porcentaje de tareas completadas vs total", 0.0, "%", "RENDIMIENTO");
+        }
+        long completadas = tareas.stream()
+                .filter(t -> "COMPLETADA".equalsIgnoreCase(t.getEstadoTarea()))
+                .count();
+        double tasa = (completadas * 100.0) / tareas.size();
+        tasa = Math.round(tasa * 100.0) / 100.0;
+        return new KpiDTO("Tasa de completitud", "Porcentaje de tareas completadas vs total", tasa, "%", "RENDIMIENTO");
+    }
+
+    // ==========================================================
     // OBTENER TODOS LOS KPIS
     // ==========================================================
     public List<KpiDTO> getAllKpis() {
@@ -228,6 +274,9 @@ public class KpiService {
         kpis.add(getRecursosOcupados());
         kpis.add(getPorcentajeUtilizacionRecursos());
         kpis.add(getTareasCompletadas());
+        kpis.add(getTareasCompletadasUltimaSemana());
+        kpis.add(getProyectosCambiadosEstaSemana());
+        kpis.add(getTasaCompletitudTareas());
         return kpis;
     }
 
